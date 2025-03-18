@@ -52,10 +52,6 @@ Use the provided GIF assets in the `assets` directory for visual guidance and ex
 
 We welcome contributions, suggestions, and issue reports! Please submit a pull request or create an issue to discuss improvements or report bugs.
 
-## License
-
-This project is provided under the MIT License. See the [LICENSE](LICENSE) file for details.
-
 ---
 
 Enjoy the workshops, and happy coding!
