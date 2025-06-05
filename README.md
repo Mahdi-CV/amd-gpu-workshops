@@ -9,6 +9,7 @@ Welcome to the AMD GPU Workshops repository! This repository hosts multiple work
 |-----------------------------------------------------|-----------------------------------------------------------|-------------------------------------------|
 | **DeepSeek-R1 Deployment with AMD GPUs**            | Deploying DeepSeek-R1 using vLLM, Open WebUI, and CodeGPT | [deepseekr1_vllm.ipynb](notebooks/deepseekr1_vllm.ipynb) |
 | **AI Agent with MCPs using vLLM, Pydantic AI**      | Build Airbnb finder agent usign vLLM, MCP, and Pydantic-AI | [build_agents.ipynb](notebooks/build_agents.ipynb) |
+| **AI Agent with MCPs using vLLM, OpenManus**      | Build Airbnb finder agent usign vLLM, MCP, and OpenManus | [openmanus_workshop.ipynb](notebooks/openmanus_workshop.ipynb) |
 
 (More workshops will be added soon!)
 
