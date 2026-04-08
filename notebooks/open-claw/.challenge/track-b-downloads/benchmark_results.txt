@@ -1,0 +1,3 @@
+MI300X vs H100 benchmark (internal draft)
+Tokens/sec: TBD
+Power: TBD
