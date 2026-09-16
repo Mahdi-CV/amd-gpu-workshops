@@ -612,7 +612,7 @@ def test_report() -> None:
         print(task)
         print()
         print("Hermes is working. Its model and tool loop may take a few minutes.")
-        print("Follow individual routing decisions in Dashboard → Insights.")
+        print("Success means Hermes finishes the edit and the tests pass.")
         print(flush=True)
 
         started = time.monotonic()
