@@ -1,0 +1,85 @@
+# syntax=docker/dockerfile:1.7
+
+ARG VLLM_BASE_IMAGE
+ARG VLLM_SR_IMAGE
+ARG DASHBOARD_IMAGE
+
+FROM ${VLLM_SR_IMAGE} AS router
+FROM ${DASHBOARD_IMAGE} AS dashboard
+FROM envoyproxy/envoy:v1.34-latest AS envoy
+
+FROM ${VLLM_BASE_IMAGE}
+
+ARG SOURCE_REVISION=unavailable
+ARG VLLM_SR_PYTHON_VERSION=0.3.0
+
+LABEL org.opencontainers.image.title="vLLM-SR Route One Agent Workshop"
+LABEL org.opencontainers.image.revision="${SOURCE_REVISION}"
+
+USER root
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        curl \
+        git \
+        patch \
+        procps \
+        ripgrep \
+        tini \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN python3 -m venv /opt/workshop-venv \
+    && /opt/workshop-venv/bin/pip install --no-cache-dir --upgrade pip \
+    && /opt/workshop-venv/bin/pip install --no-cache-dir \
+        "vllm-sr==${VLLM_SR_PYTHON_VERSION}"
+
+COPY .deploy/requirements.txt /tmp/workshop-requirements.txt
+RUN /opt/workshop-venv/bin/pip install --no-cache-dir \
+      -r /tmp/workshop-requirements.txt \
+    && rm /tmp/workshop-requirements.txt
+
+COPY --from=router /usr/local/bin/router /usr/local/bin/router
+COPY --from=dashboard /app/dashboard-backend /opt/vllm-sr/dashboard-backend
+COPY --from=dashboard /app/frontend /opt/vllm-sr/frontend
+COPY --from=envoy /usr/local/bin/envoy /usr/local/bin/envoy
+
+COPY .deploy /opt/workshop/deploy
+COPY route-one-agent-across-two-models-v3.ipynb /opt/workshop/templates/
+COPY workshop_lab.py /opt/workshop/templates/
+
+RUN mkdir -p \
+      /opt/workshop/bin \
+      /opt/workshop/config \
+      /opt/workshop/patches \
+      /workspace \
+      /workspace/generated-config \
+      /workspace/logs \
+      /workspace/state \
+      /models \
+    && cp /opt/workshop/deploy/bin/*.sh /opt/workshop/bin/ \
+    && cp /opt/workshop/deploy/config/* /opt/workshop/config/ \
+    && cp /opt/workshop/deploy/patches/* /opt/workshop/patches/ \
+    && chmod +x /opt/workshop/bin/*.sh \
+    && SITE_PACKAGES=$(/opt/workshop-venv/bin/python3 -c \
+      'import site; print(site.getsitepackages()[0])') \
+    && patch -p1 -d "${SITE_PACKAGES}" \
+      < /opt/workshop/patches/hermes-agent-0.19-vsr-message-name.patch
+
+ENV PATH="/opt/workshop-venv/bin:${PATH}" \
+    HERMES_HOME="/workspace/state/hermes" \
+    VLLM_SR_WORKSHOP_DIR="/workspace/generated-config" \
+    ROUTINE_ENDPOINT="http://127.0.0.1:8002" \
+    REASONING_ENDPOINT="http://127.0.0.1:8001" \
+    ROUTER_MANAGEMENT_API="http://127.0.0.1:8080" \
+    ROUTER_API="http://127.0.0.1:8898" \
+    DASHBOARD_URL="http://127.0.0.1:8700" \
+    ROUTINE_PROVIDER_MODEL="gemma-4-12b" \
+    REASONING_PROVIDER_MODEL="qwen3.8-27b" \
+    VLLM_ROCM_USE_AITER="1" \
+    VLLM_ROCM_USE_AITER_FUSION_SHARED_EXPERTS="1"
+
+EXPOSE 8888 8700
+
+WORKDIR /workspace
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/opt/workshop/bin/entrypoint.sh"]

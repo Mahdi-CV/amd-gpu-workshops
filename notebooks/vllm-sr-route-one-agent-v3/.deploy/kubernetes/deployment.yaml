@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vllm-sr-agent-workshop
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vllm-sr-agent-workshop
+  template:
+    metadata:
+      labels:
+        app: vllm-sr-agent-workshop
+    spec:
+      containers:
+        - name: workshop
+          image: vllm-sr-agent-workshop:replace-with-pinned-tag
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: JUPYTER_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: vllm-sr-agent-workshop
+                  key: jupyter-token
+            - name: DASHBOARD_ADMIN_EMAIL
+              valueFrom:
+                secretKeyRef:
+                  name: vllm-sr-agent-workshop
+                  key: dashboard-admin-email
+            - name: DASHBOARD_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: vllm-sr-agent-workshop
+                  key: dashboard-admin-password
+            - name: DASHBOARD_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: vllm-sr-agent-workshop
+                  key: dashboard-jwt-secret
+            - name: DASHBOARD_BROWSER_URL
+              value: /proxy/8700/
+          ports:
+            - name: jupyter
+              containerPort: 8888
+            - name: dashboard
+              containerPort: 8700
+          resources:
+            requests:
+              amd.com/gpu: "1"
+            limits:
+              amd.com/gpu: "1"
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: model-cache
+              mountPath: /models
+              readOnly: true
+            - name: workspace
+              mountPath: /workspace
+            - name: shm
+              mountPath: /dev/shm
+          readinessProbe:
+            httpGet:
+              path: /api
+              port: jupyter
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: model-cache
+          persistentVolumeClaim:
+            claimName: replace-with-model-cache-pvc
+        - name: workspace
+          emptyDir: {}
+        - name: shm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 32Gi

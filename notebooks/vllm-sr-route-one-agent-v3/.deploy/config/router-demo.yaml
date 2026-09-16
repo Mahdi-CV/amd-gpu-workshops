@@ -1,0 +1,94 @@
+version: v0.3
+
+listeners:
+  - name: workshop
+    address: 0.0.0.0
+    port: 8898
+    timeout: 600s
+
+providers:
+  defaults:
+    default_model: routine-model
+  models:
+    - name: routine-model
+      api_format: openai
+      provider_model_id: gemma-4-12b
+      backend_refs:
+        - name: routine-backend
+          endpoint: 127.0.0.1:8002
+          protocol: http
+          type: vllm
+          weight: 1
+    - name: reasoning-model
+      api_format: openai
+      provider_model_id: qwen3.8-27b
+      backend_refs:
+        - name: reasoning-backend
+          endpoint: 127.0.0.1:8001
+          protocol: http
+          type: vllm
+          weight: 1
+
+routing:
+  modelCards:
+    - name: routine-model
+      modality: text
+      context_window_size: 65536
+    - name: reasoning-model
+      modality: text
+      context_window_size: 65536
+  signals:
+    complexity:
+      - name: request_complexity
+        threshold: 0.10
+        description: Separate direct requests from reasoning-heavy work.
+        hard:
+          candidates:
+            - solve a multi-step problem
+            - compare competing designs and justify a choice
+            - diagnose a failure from incomplete evidence
+        easy:
+          candidates:
+            - give a short definition
+            - summarize this briefly
+            - rewrite a sentence
+  decisions:
+    - name: reasoning-lane
+      description: Use the stronger model for difficult work.
+      priority: 200
+      rules:
+        operator: AND
+        conditions:
+          - type: complexity
+            name: request_complexity:hard
+      modelRefs:
+        - model: reasoning-model
+          use_reasoning: true
+      algorithm:
+        type: static
+    - name: routine-lane
+      description: Use the routine model for everything else.
+      priority: 100
+      rules:
+        operator: AND
+        conditions: []
+      modelRefs:
+        - model: routine-model
+      algorithm:
+        type: static
+
+global:
+  router:
+    auto_model_names:
+      - vllm-sr/auto
+  services:
+    management_api:
+      bind_address: 127.0.0.1
+      port: 8080
+      remote_exposure: false
+    router_replay:
+      enabled: true
+      store_backend: memory
+  stores:
+    response_cache:
+      enabled: false

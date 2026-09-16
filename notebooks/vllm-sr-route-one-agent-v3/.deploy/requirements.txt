@@ -1,0 +1,6 @@
+hermes-agent==0.19.0
+jupyter-server-proxy
+jupyterlab
+pytest
+requests
+PyYAML
