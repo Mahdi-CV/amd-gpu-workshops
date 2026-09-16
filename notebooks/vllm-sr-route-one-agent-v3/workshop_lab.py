@@ -57,8 +57,10 @@ class WorkshopLab:
             "ROUTER_MANAGEMENT_API", f"http://{host}:8080"
         )
         self.dashboard_url = os.getenv("DASHBOARD_URL", f"http://{host}:8700")
+        _pod = os.environ.get("HOSTNAME", "")
         self.dashboard_browser_url = os.getenv(
-            "DASHBOARD_BROWSER_URL", "http://localhost:8700"
+            "DASHBOARD_BROWSER_URL",
+            f"/{_pod}/proxy/8700/" if _pod else "http://localhost:8700",
         )
         self.routine_endpoint = os.getenv(
             "ROUTINE_ENDPOINT", f"http://{host}:8002"

@@ -44,6 +44,13 @@ RUN /opt/workshop-venv/bin/pip install --no-cache-dir \
     && rm /tmp/workshop-requirements.txt
 
 COPY --from=router /usr/local/bin/router /usr/local/bin/router
+COPY --from=router /usr/local/lib/libcandle_semantic_router.so /usr/local/lib/
+COPY --from=router /usr/local/lib/libnlp_binding.so /usr/local/lib/
+COPY --from=router /usr/local/lib/libonnx_semantic_router.so /usr/local/lib/
+COPY --from=router /usr/local/lib/libml_semantic_router.so /usr/local/lib/
+COPY --from=router /usr/local/lib/libonnxruntime_providers_shared.so /usr/local/lib/
+COPY --from=router /usr/local/lib/libonnxruntime.so.1.22.0 /usr/local/lib/
+RUN ldconfig
 COPY --from=dashboard /app/dashboard-backend /opt/vllm-sr/dashboard-backend
 COPY --from=dashboard /app/frontend /opt/vllm-sr/frontend
 COPY --from=envoy /usr/local/bin/envoy /usr/local/bin/envoy
@@ -77,6 +84,7 @@ RUN mkdir -p \
       < /opt/workshop/patches/hermes-agent-0.19-vsr-message-name.patch
 
 ENV PATH="/opt/workshop-venv/bin:${PATH}" \
+    HF_HOME="/root/.cache/huggingface" \
     HERMES_HOME="/workspace/state/hermes" \
     VLLM_SR_WORKSHOP_DIR="/workspace/generated-config" \
     ROUTINE_ENDPOINT="http://127.0.0.1:8002" \
