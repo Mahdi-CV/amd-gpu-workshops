@@ -3,6 +3,7 @@
 ARG VLLM_BASE_IMAGE
 ARG VLLM_SR_IMAGE
 ARG DASHBOARD_IMAGE
+ARG VLLM_SR_CONTRACT_REVISION
 
 FROM ${VLLM_SR_IMAGE} AS router
 FROM ${DASHBOARD_IMAGE} AS dashboard
@@ -11,10 +12,12 @@ FROM envoyproxy/envoy:v1.34-latest AS envoy
 FROM ${VLLM_BASE_IMAGE}
 
 ARG SOURCE_REVISION=unavailable
-ARG VLLM_SR_PYTHON_VERSION=0.3.0
+ARG VLLM_SR_CONTRACT_REVISION
+ARG VLLM_SR_PYTHON_SPEC
 
 LABEL org.opencontainers.image.title="vLLM-SR Route One Agent Workshop"
 LABEL org.opencontainers.image.revision="${SOURCE_REVISION}"
+LABEL ai.vllm.semantic-router.revision="${VLLM_SR_CONTRACT_REVISION}"
 
 USER root
 
@@ -30,8 +33,10 @@ RUN apt-get update \
 
 RUN python3 -m venv /opt/workshop-venv \
     && /opt/workshop-venv/bin/pip install --no-cache-dir --upgrade pip \
+    && test -n "${VLLM_SR_CONTRACT_REVISION}" \
+    && test -n "${VLLM_SR_PYTHON_SPEC}" \
     && /opt/workshop-venv/bin/pip install --no-cache-dir \
-        "vllm-sr==${VLLM_SR_PYTHON_VERSION}"
+        "${VLLM_SR_PYTHON_SPEC}"
 
 COPY .deploy/requirements.txt /tmp/workshop-requirements.txt
 RUN /opt/workshop-venv/bin/pip install --no-cache-dir \
@@ -42,6 +47,11 @@ COPY --from=router /usr/local/bin/router /usr/local/bin/router
 COPY --from=dashboard /app/dashboard-backend /opt/vllm-sr/dashboard-backend
 COPY --from=dashboard /app/frontend /opt/vllm-sr/frontend
 COPY --from=envoy /usr/local/bin/envoy /usr/local/bin/envoy
+
+RUN printf '%s\n' \
+      "VLLM_SR_CONTRACT_REVISION=${VLLM_SR_CONTRACT_REVISION}" \
+      "VLLM_SR_PYTHON_SPEC=${VLLM_SR_PYTHON_SPEC}" \
+      > /opt/vllm-sr-contract.env
 
 COPY .deploy /opt/workshop/deploy
 COPY route-one-agent-across-two-models-v3.ipynb /opt/workshop/templates/

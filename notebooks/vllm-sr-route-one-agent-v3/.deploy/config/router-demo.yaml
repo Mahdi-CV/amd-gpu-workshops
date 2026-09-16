@@ -7,8 +7,6 @@ listeners:
     timeout: 600s
 
 providers:
-  defaults:
-    default_model: routine-model
   models:
     - name: routine-model
       api_format: openai
@@ -17,7 +15,6 @@ providers:
         - name: routine-backend
           endpoint: 127.0.0.1:8002
           protocol: http
-          type: vllm
           weight: 1
     - name: reasoning-model
       api_format: openai
@@ -26,7 +23,6 @@ providers:
         - name: reasoning-backend
           endpoint: 127.0.0.1:8001
           protocol: http
-          type: vllm
           weight: 1
 
 routing:
@@ -44,14 +40,16 @@ routing:
         description: Separate direct requests from reasoning-heavy work.
         hard:
           candidates:
-            - solve a multi-step problem
-            - compare competing designs and justify a choice
-            - diagnose a failure from incomplete evidence
+            - diagnose cascading failures in a distributed system
+            - compare multiple remediation strategies and their tradeoffs
+            - analyze a root cause and justify a safe rollout plan
+            - investigate a complex production failure from incomplete evidence
+            - solve a multi-step system design problem
         easy:
           candidates:
-            - give a short definition
-            - summarize this briefly
-            - rewrite a sentence
+            - define a technical term in one sentence
+            - summarize a short passage briefly
+            - rewrite a sentence without analysis
   decisions:
     - name: reasoning-lane
       description: Use the stronger model for difficult work.

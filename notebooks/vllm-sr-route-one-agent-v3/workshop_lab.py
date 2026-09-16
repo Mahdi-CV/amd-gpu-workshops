@@ -1,8 +1,4 @@
-"""Small participant-facing helpers for the vLLM-SR agent workshop.
-
-The workshop image owns environment discovery and process wiring. Notebook
-cells call this module so learners can focus on routing behavior.
-"""
+"""Participant-facing helpers for the vLLM-SR agent workshop."""
 
 from __future__ import annotations
 
@@ -10,13 +6,16 @@ import json
 import os
 from pathlib import Path
 from pprint import pformat
+import selectors
 import shutil
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 
 import requests
+import yaml
 
 
 def _tcp_ready(host: str, port: int, timeout: float = 0.25) -> bool:
@@ -142,7 +141,7 @@ class WorkshopLab:
             print(f"The workshop image must provide: {script}")
             return self.status()
 
-        print("Starting Router, Envoy, Dashboard, and Insights support...")
+        print("Starting the Router, Envoy, and Dashboard...")
         result = subprocess.run(
             [str(script)],
             check=False,
@@ -275,6 +274,109 @@ class WorkshopLab:
         print(pformat(result))
         return result
 
+    def routed_turn(
+        self,
+        history: list[dict[str, str]],
+        prompt: str,
+        max_tokens: int = 120,
+    ) -> tuple[list[dict[str, str]], dict]:
+        """Send one user turn while preserving the preceding conversation."""
+        messages = [*history, {"role": "user", "content": prompt}]
+        headers = {
+            "content-type": "application/json",
+            "x-vsr-debug": "true",
+        }
+        response = requests.post(
+            f"{self.router_api.rstrip('/')}/v1/chat/completions",
+            headers=headers,
+            json={
+                "model": self.virtual_model,
+                "messages": messages,
+                "max_tokens": max_tokens,
+            },
+            timeout=650,
+        )
+        response.raise_for_status()
+        body = response.json()
+        answer = (
+            body.get("choices", [{}])[0].get("message", {}).get("content", "")
+        )
+        observed = {
+            "prompt": prompt,
+            "matched_complexity": response.headers.get(
+                "x-vsr-matched-complexity"
+            ),
+            "decision": response.headers.get("x-vsr-selected-decision"),
+            "selected_model": response.headers.get("x-vsr-selected-model"),
+            "replay_id": response.headers.get("x-vsr-replay-id"),
+            "answer": answer,
+        }
+        print(pformat(observed))
+        return [*messages, {"role": "assistant", "content": answer}], observed
+
+    def compare_predictions(self, prompts: list[dict[str, str]]) -> list[dict]:
+        """Route learner-authored prompts and compare predictions to evidence."""
+        results = []
+        for item in prompts:
+            label = item["label"]
+            prompt = item["prompt"]
+            prediction = item["prediction"]
+            print(f"\n{label}: {prompt}")
+            print(f"Prediction: {prediction}")
+            observed = self.routed_chat(prompt, max_tokens=80)
+            results.append(
+                {
+                    **item,
+                    "observed_complexity": observed.get("matched_complexity"),
+                    "observed_decision": observed.get("decision"),
+                    "observed_model": observed.get("selected_model"),
+                    "replay_id": observed.get("replay_id"),
+                }
+            )
+        return results
+
+    def replay_signal_values(self, replay_id: str) -> dict[str, float]:
+        """Fetch raw signal values for one request from Router Replay."""
+        if not replay_id:
+            raise ValueError("The response did not include x-vsr-replay-id.")
+        paths = (
+            f"{self.router_api.rstrip('/')}/v1/router_replay/{replay_id}",
+            f"{self.management_api.rstrip('/')}/v1/router_replay/{replay_id}",
+        )
+        failures = []
+        for url in paths:
+            try:
+                response = requests.get(url, timeout=15)
+                if not response.ok:
+                    failures.append(f"{url}: HTTP {response.status_code}")
+                    continue
+                body = response.json()
+                record = body.get("data", body)
+                values = record.get("signal_values", {})
+                if values:
+                    return values
+                failures.append(f"{url}: response contained no signal_values")
+            except (requests.RequestException, ValueError) as exc:
+                failures.append(f"{url}: {exc}")
+        raise RuntimeError(
+            "Router Replay did not return signal values. Confirm the pinned "
+            "workshop runtime exposes /v1/router_replay and that "
+            "global.services.router_replay.enabled is true.\n"
+            + "\n".join(failures)
+        )
+
+    def complexity_evidence(self, routed_result: dict) -> dict[str, float]:
+        """Print the easy score, hard score, and margin for one request."""
+        values = self.replay_signal_values(routed_result.get("replay_id"))
+        prefix = "complexity:request_complexity:"
+        evidence = {
+            "hard_score": values.get(prefix + "text_hard_score"),
+            "easy_score": values.get(prefix + "text_easy_score"),
+            "margin": values.get(prefix + "text_margin"),
+        }
+        print(pformat(evidence))
+        return evidence
+
     def agent_command(self, task: str) -> str:
         command = f'hermes -z {json.dumps(task)} --yolo'
         print(command)
@@ -341,43 +443,117 @@ def test_report() -> None:
         for relative_path, content in files.items():
             (target / relative_path).write_text(content, encoding="utf-8")
 
-        print("Created a disposable exercise copy:")
+        print("Created a clean working copy for the Hermes exercise:")
         print(target)
-        print()
-        print("The helper can recreate this clean fixture whenever needed.")
+        print("Run this setup cell again whenever you want to reset the project.")
         return target
 
-    @staticmethod
-    def _request_count(endpoint: str) -> int | None:
-        try:
-            response = requests.get(f"{endpoint.rstrip('/')}/metrics", timeout=10)
-            response.raise_for_status()
-        except requests.RequestException:
-            return None
+    def boot_check(
+        self,
+        config_path: Path,
+        timeout_seconds: int = 90,
+        required: bool = True,
+    ) -> bool:
+        """Require the bundled Router binary to reach startup_complete."""
+        development_router = Path("/opt/workshop-router/bin/router")
+        router = (
+            os.getenv("VLLM_SR_ROUTER_BIN")
+            or shutil.which("router")
+            or (str(development_router) if development_router.is_file() else None)
+        )
+        if not router:
+            allow_skip = os.getenv("VLLM_SR_ALLOW_SKIP_BOOT_CHECK") == "1"
+            if required and not allow_skip:
+                raise RuntimeError(
+                    "Router boot check is required, but no Router binary was "
+                    "found. Bundle the pinned binary or explicitly set "
+                    "VLLM_SR_ALLOW_SKIP_BOOT_CHECK=1 in a development-only "
+                    "environment."
+                )
+            print("! ROUTER BOOT CHECK SKIPPED")
+            print("  No Router binary is available in this environment.")
+            print("  Do not publish a workshop image with this opt-out enabled.")
+            return False
 
-        total = 0.0
-        found = False
-        for line in response.text.splitlines():
-            if not line.startswith("vllm:request_success_total{"):
-                continue
-            if 'finished_reason="error"' in line or 'finished_reason="abort"' in line:
-                continue
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            grpc_port = sock.getsockname()[1]
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            api_port = sock.getsockname()[1]
+
+        services = config.setdefault("global", {}).setdefault("services", {})
+        management = services.setdefault("management_api", {})
+        management["bind_address"] = "127.0.0.1"
+        management["port"] = api_port
+        management["remote_exposure"] = False
+
+        with tempfile.TemporaryDirectory(prefix="vllm-sr-boot-check-") as tmp:
+            smoke_config = Path(tmp) / "config.yaml"
+            smoke_config.write_text(
+                yaml.safe_dump(config, sort_keys=False),
+                encoding="utf-8",
+            )
+            process = subprocess.Popen(
+                [
+                    router,
+                    f"-config={smoke_config}",
+                    f"-port={grpc_port}",
+                    "-enable-api=true",
+                ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                env={
+                    **os.environ,
+                    "LD_LIBRARY_PATH": ":".join(
+                        part
+                        for part in (
+                            "/opt/workshop-router/lib",
+                            os.getenv("LD_LIBRARY_PATH", ""),
+                        )
+                        if part
+                    ),
+                },
+            )
+            lines: list[str] = []
+            deadline = time.monotonic() + timeout_seconds
+            selector = selectors.DefaultSelector()
+            assert process.stdout is not None
+            selector.register(process.stdout, selectors.EVENT_READ)
             try:
-                total += float(line.rsplit(" ", 1)[1])
-                found = True
-            except (IndexError, ValueError):
-                continue
-        return int(total) if found else None
+                while time.monotonic() < deadline:
+                    if process.poll() is not None:
+                        break
+                    events = selector.select(timeout=0.25)
+                    if not events:
+                        continue
+                    for key, _ in events:
+                        line = key.fileobj.readline()
+                        if not line:
+                            continue
+                        lines.append(line)
+                        if "startup_complete" in line:
+                            print(
+                                f"✓ Router booted {config_path.name} "
+                                f"with the bundled runtime"
+                            )
+                            return True
+            finally:
+                selector.close()
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait(timeout=10)
 
-    def route_counts(self, *, show: bool = True) -> dict[str, int | None]:
-        counts = {
-            "routine-model": self._request_count(self.routine_endpoint),
-            "reasoning-model": self._request_count(self.reasoning_endpoint),
-        }
-        if show:
-            for model, count in counts.items():
-                print(f"{model:16} {count if count is not None else 'unavailable'}")
-        return counts
+            tail = "".join(lines[-30:])
+            raise RuntimeError(
+                f"Router did not boot {config_path.name}.\n"
+                f"Last Router output:\n{tail}"
+            )
 
     def run_agent(self, task: str, exercise_dir: Path) -> dict:
         hermes = shutil.which("hermes")
@@ -428,7 +604,6 @@ def test_report() -> None:
                 "reason": "hermes is not configured for vllm-sr",
             }
 
-        before = self.route_counts()
         stdout_path = exercise_dir / ".hermes-stdout.log"
         stderr_path = exercise_dir / ".hermes-stderr.log"
 
@@ -436,8 +611,8 @@ def test_report() -> None:
         print("Starting Hermes with one task:")
         print(task)
         print()
-        print("Hermes is working. This normally takes a few minutes.")
-        print("The counters below update while its internal model/tool loop runs.")
+        print("Hermes is working. Its model and tool loop may take a few minutes.")
+        print("Follow individual routing decisions in Dashboard → Insights.")
         print(flush=True)
 
         started = time.monotonic()
@@ -454,23 +629,9 @@ def test_report() -> None:
             try:
                 while process.poll() is None:
                     elapsed = int(time.monotonic() - started)
-                    current = self.route_counts(show=False)
-                    deltas = {
-                        model: (
-                            current[model] - before[model]
-                            if before[model] is not None
-                            and current[model] is not None
-                            else None
-                        )
-                        for model in before
-                    }
-                    routine_delta = deltas["routine-model"]
-                    reasoning_delta = deltas["reasoning-model"]
                     print(
                         f"[{elapsed // 60:02d}:{elapsed % 60:02d}] "
-                        f"agent still working | "
-                        f"routine +{routine_delta if routine_delta is not None else '?'} | "
-                        f"reasoning +{reasoning_delta if reasoning_delta is not None else '?'}",
+                        "agent still working",
                         flush=True,
                     )
                     if elapsed >= 900:
@@ -510,41 +671,12 @@ def test_report() -> None:
         if tests.returncode:
             raise RuntimeError("The exercise tests failed after the Hermes run.")
 
-        after = self.route_counts()
-        delta = {
-            model: (
-                after[model] - before[model]
-                if before[model] is not None and after[model] is not None
-                else None
-            )
-            for model in before
-        }
-        print()
-        print("Requests added during the agent task:")
-        for model, count in delta.items():
-            print(f"{model:16} {count if count is not None else 'unavailable'}")
-
         return {
             "completed": True,
             "working_directory": str(exercise_dir),
-            "before": before,
-            "after": after,
-            "delta": delta,
             "final_response": stdout.strip(),
-        }
-
-    def incident_challenge_template(self) -> dict:
-        return {
-            "requirement": "",
-            "signal": "",
-            "decision": "",
-            "priority": None,
-            "model": "",
-            "positive_test": "",
-            "negative_test": "",
-            "collision_test": "",
-            "observed_result": "",
-            "explanation": "",
+            "stdout_log": str(stdout_path),
+            "stderr_log": str(stderr_path),
         }
 
 
