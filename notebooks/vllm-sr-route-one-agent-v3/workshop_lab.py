@@ -318,7 +318,17 @@ class WorkshopLab:
             "replay_id": response.headers.get("x-vsr-replay-id"),
             "answer": answer,
         }
-        print(pformat(observed))
+        print(
+            pformat(
+                {
+                    "prompt": observed["prompt"],
+                    "matched_complexity": observed["matched_complexity"],
+                    "decision": observed["decision"],
+                    "selected_model": observed["selected_model"],
+                    "replay_id": observed["replay_id"],
+                }
+            )
+        )
         return [*messages, {"role": "assistant", "content": answer}], observed
 
     def compare_predictions(self, prompts: list[dict[str, str]]) -> list[dict]:
