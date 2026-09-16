@@ -11,6 +11,8 @@ rm -rf \
 cp /opt/workshop/templates/route-one-agent-across-two-models-v3.ipynb \
   /workspace/route-one-agent-across-two-models-v3.ipynb
 cp /opt/workshop/templates/workshop_lab.py /workspace/workshop_lab.py
+rm -rf /workspace/agent-demo
+cp -a /opt/workshop/templates/agent-demo /workspace/
 
 /opt/workshop/bin/configure-hermes.sh
 

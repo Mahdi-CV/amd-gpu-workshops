@@ -230,7 +230,11 @@ class WorkshopLab:
             timeout=650,
         )
         elapsed = time.perf_counter() - started
-        response.raise_for_status()
+        if not response.ok:
+            raise RuntimeError(
+                f"Routed request failed with HTTP {response.status_code}:\n"
+                f"{response.text[:2000]}"
+            )
         body = response.json()
         return {
             "requested_model": model,
@@ -296,11 +300,14 @@ class WorkshopLab:
             },
             timeout=650,
         )
-        response.raise_for_status()
+        if not response.ok:
+            raise RuntimeError(
+                f"Turn failed with HTTP {response.status_code}:\n"
+                f"{response.text[:2000]}"
+            )
         body = response.json()
-        answer = (
-            body.get("choices", [{}])[0].get("message", {}).get("content", "")
-        )
+        message = body.get("choices", [{}])[0].get("message", {})
+        answer = message.get("content") or message.get("reasoning") or ""
         observed = {
             "prompt": prompt,
             "matched_complexity": response.headers.get(
@@ -390,58 +397,12 @@ class WorkshopLab:
         target = self.workspace / "agent-demo-working"
         if target.exists():
             shutil.rmtree(target)
-        target.mkdir(parents=True)
-
-        files = {
-            "README.md": """# Pricing report demo
-
-This deliberately small project calculates item totals and renders a text
-report. The implementation contains duplicated discount logic for the agent to
-identify and refactor.
-
-Run:
-
-```bash
-python -m pytest -q
-```
-""",
-            "pricing.py": """def customer_total(subtotal: float, premium: bool) -> float:
-    discount = 0.10 if premium else 0.0
-    return round(subtotal * (1 - discount), 2)
-
-
-def invoice_total(subtotal: float, premium: bool) -> float:
-    discount = 0.10 if premium else 0.0
-    return round(subtotal * (1 - discount), 2)
-""",
-            "reporting.py": """from pricing import customer_total, invoice_total
-
-
-def render_report(subtotal: float, premium: bool) -> str:
-    customer = customer_total(subtotal, premium)
-    invoice = invoice_total(subtotal, premium)
-    return f"customer={customer:.2f}\\ninvoice={invoice:.2f}\\n"
-""",
-            "test_pricing.py": """from pricing import customer_total, invoice_total
-from reporting import render_report
-
-
-def test_regular_customer_totals() -> None:
-    assert customer_total(100, False) == 100
-    assert invoice_total(100, False) == 100
-
-
-def test_premium_customer_totals() -> None:
-    assert customer_total(100, True) == 90
-    assert invoice_total(100, True) == 90
-
-
-def test_report() -> None:
-    assert render_report(100, True) == "customer=90.00\\ninvoice=90.00\\n"
-""",
-        }
-        for relative_path, content in files.items():
-            (target / relative_path).write_text(content, encoding="utf-8")
+        source = Path(__file__).resolve().parent / "agent-demo"
+        if not source.is_dir():
+            raise RuntimeError(
+                f"The visible workshop exercise is missing: {source}"
+            )
+        shutil.copytree(source, target)
 
         print("Created a clean working copy for the Hermes exercise:")
         print(target)

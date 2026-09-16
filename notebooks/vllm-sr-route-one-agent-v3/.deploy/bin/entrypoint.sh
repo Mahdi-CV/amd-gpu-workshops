@@ -13,6 +13,9 @@ fi
 if [[ ! -f /workspace/workshop_lab.py ]]; then
   cp /opt/workshop/templates/workshop_lab.py /workspace/
 fi
+if [[ ! -d /workspace/agent-demo ]]; then
+  cp -a /opt/workshop/templates/agent-demo /workspace/
+fi
 
 /opt/workshop/bin/configure-hermes.sh
 

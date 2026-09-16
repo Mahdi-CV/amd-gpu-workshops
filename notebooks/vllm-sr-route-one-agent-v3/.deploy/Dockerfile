@@ -56,6 +56,7 @@ RUN printf '%s\n' \
 COPY .deploy /opt/workshop/deploy
 COPY route-one-agent-across-two-models-v3.ipynb /opt/workshop/templates/
 COPY workshop_lab.py /opt/workshop/templates/
+COPY agent-demo /opt/workshop/templates/agent-demo
 
 RUN mkdir -p \
       /opt/workshop/bin \
