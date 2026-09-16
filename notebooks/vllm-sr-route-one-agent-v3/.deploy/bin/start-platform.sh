@@ -16,7 +16,7 @@ wait_http() {
   local url=$2
   local attempts=${3:-120}
   for ((attempt = 1; attempt <= attempts; attempt++)); do
-    if curl --fail --silent --show-error --max-time 3 "${url}" >/dev/null; then
+    if curl --fail --silent --max-time 3 "${url}" >/dev/null 2>&1; then
       printf '✓ %s\n' "${name}"
       return 0
     fi
@@ -57,7 +57,7 @@ else
     -config="${CONFIG_PATH}" \
     -port=50051 \
     -enable-api=true \
-    >"${LOG_DIR}/router.log" 2>&1 &
+    </dev/null >"${LOG_DIR}/router.log" 2>&1 &
   echo $! >"${STATE_DIR}/router.pid"
 fi
 wait_http "Router management" "${ROUTER_MANAGEMENT_API}/health"
@@ -69,7 +69,8 @@ else
   nohup /usr/local/bin/envoy \
     -c "${STATE_DIR}/envoy.yaml" \
     --log-level info \
-    >"${LOG_DIR}/envoy.log" 2>&1 &
+    --disable-hot-restart \
+    </dev/null >"${LOG_DIR}/envoy.log" 2>&1 &
   echo $! >"${STATE_DIR}/envoy.pid"
 fi
 wait_http "routed model" "${ROUTER_API}/v1/models"
@@ -90,10 +91,10 @@ else
   DASHBOARD_ADMIN_PASSWORD="${DASHBOARD_ADMIN_PASSWORD:-workshop2026}" \
   DASHBOARD_JWT_SECRET="${DASHBOARD_JWT_SECRET:-workshop-jwt-secret-$(hostname)}" \
   nohup /opt/vllm-sr/dashboard-backend \
-    -port=8700 \
+    -port=9000 \
     -static=/opt/vllm-sr/frontend \
     -config="${CONFIG_PATH}" \
-    >"${LOG_DIR}/dashboard.log" 2>&1 &
+    </dev/null >"${LOG_DIR}/dashboard.log" 2>&1 &
   echo $! >"${STATE_DIR}/dashboard.pid"
 fi
 wait_http "Dashboard" "${DASHBOARD_URL}"
