@@ -205,6 +205,21 @@ Jupyter             http://127.0.0.1:8888/api
 Do not approve the image based only on health checks or
 `vllm-sr validate`.
 
+With both vLLM model servers and the workshop platform running, execute:
+
+```bash
+WORKSHOP_E2E_CONFIRM_MUTATION=1 \
+  python3 /opt/workshop/bin/verify-notebook-e2e.py
+```
+
+This test temporarily deploys Stage 5 and a sample custom route. It restores
+the baseline Router configuration in a `finally` block and writes the executed
+notebook to:
+
+```text
+/workspace/state/acceptance/route-one-agent-e2e.executed.ipynb
+```
+
 Run the notebook from a clean kernel and verify:
 
 1. Direct calls reach both vLLM backends.
