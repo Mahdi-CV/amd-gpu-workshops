@@ -7,3 +7,6 @@ env/
 
 # Archives
 *.zip
+
+# Pre-built wheels (rebuild with: pip wheel --no-deps -w .deploy/ src/vllm-sr/)
+*.whl
