@@ -12,6 +12,12 @@ Presenter delivery instructions are in:
 .deploy/PRESENTER-GUIDE.md
 ```
 
+Completed participant exercises and their expected results are in:
+
+```text
+.deploy/SOLUTION-KEY.md
+```
+
 ## Kubernetes branch conventions
 
 This branch runs Dashboard on container port `9000`. When Jupyter Server Proxy
