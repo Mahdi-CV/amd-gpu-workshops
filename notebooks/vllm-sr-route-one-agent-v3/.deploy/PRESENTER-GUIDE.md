@@ -4,6 +4,9 @@ This guide is for instructors delivering the vLLM Semantic Router workshop.
 It is intentionally stored under `.deploy/` so it does not appear in the
 participant Jupyter file browser.
 
+Completed participant exercises and their verification steps are in the
+[presenter solution key](SOLUTION-KEY.md).
+
 ## Workshop outcome
 
 Participants should leave able to explain and demonstrate:

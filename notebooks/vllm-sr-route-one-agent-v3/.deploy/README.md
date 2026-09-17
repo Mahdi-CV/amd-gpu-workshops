@@ -12,6 +12,12 @@ Presenter delivery instructions are in:
 .deploy/PRESENTER-GUIDE.md
 ```
 
+Completed participant exercises and their expected results are in:
+
+```text
+.deploy/SOLUTION-KEY.md
+```
+
 ## 1. Build one coherent Semantic Router stack
 
 Choose one immutable Semantic Router Git revision:
