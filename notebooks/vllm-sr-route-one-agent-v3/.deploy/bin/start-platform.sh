@@ -28,8 +28,46 @@ wait_http "routine model" "${ROUTINE_ENDPOINT}/v1/models"
 wait_http "reasoning model" "${REASONING_ENDPOINT}/v1/models"
 
 cp /opt/workshop/config/router-demo.yaml "${CONFIG_PATH}"
-vllm-sr validate --config "${CONFIG_PATH}"
-vllm-sr config envoy --config "${CONFIG_PATH}" >"${STATE_DIR}/envoy.yaml"
+
+if vllm-sr config validate --help >/dev/null 2>&1; then
+  VALIDATE_COMMAND=(vllm-sr config validate)
+else
+  VALIDATE_COMMAND=(vllm-sr validate)
+fi
+
+ENVOY_GEN_CONFIG="${CONFIG_PATH}"
+VALIDATION_LOG=$(mktemp "${STATE_DIR}/validate-XXXXXX.log")
+if ! "${VALIDATE_COMMAND[@]}" --config "${CONFIG_PATH}" \
+  >"${VALIDATION_LOG}" 2>&1; then
+  if grep -Eq "Default model 'None' not found|providers.defaults.default_model" \
+    "${VALIDATION_LOG}"; then
+    ENVOY_GEN_CONFIG=$(mktemp "${STATE_DIR}/envoy-gen-XXXXXX.yaml")
+    python3 - "${CONFIG_PATH}" "${ENVOY_GEN_CONFIG}" <<'PY'
+import sys
+import yaml
+
+source, destination = sys.argv[1:3]
+config = yaml.safe_load(open(source, encoding="utf-8"))
+models = config["providers"]["models"]
+config.setdefault("providers", {}).setdefault("defaults", {})[
+    "default_model"
+] = models[0]["name"]
+with open(destination, "w", encoding="utf-8") as output:
+    yaml.safe_dump(config, output, sort_keys=False)
+PY
+    "${VALIDATE_COMMAND[@]}" --config "${ENVOY_GEN_CONFIG}"
+  else
+    cat "${VALIDATION_LOG}" >&2
+    rm -f "${VALIDATION_LOG}"
+    exit 1
+  fi
+fi
+rm -f "${VALIDATION_LOG}"
+
+vllm-sr config envoy --config "${ENVOY_GEN_CONFIG}" >"${STATE_DIR}/envoy.yaml"
+if [[ "${ENVOY_GEN_CONFIG}" != "${CONFIG_PATH}" ]]; then
+  rm -f "${ENVOY_GEN_CONFIG}"
+fi
 
 if [[ -f "${STATE_DIR}/router.pid" ]] \
   && kill -0 "$(cat "${STATE_DIR}/router.pid")" 2>/dev/null; then

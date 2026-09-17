@@ -45,6 +45,15 @@ from cli.commands import runtime_support
 print("✓ Python CLI runtime imports")
 PY
 
+if vllm-sr config validate --help >/dev/null 2>&1; then
+  echo "✓ CLI command: vllm-sr config validate"
+elif vllm-sr validate --help >/dev/null 2>&1; then
+  echo "✓ CLI command: vllm-sr validate"
+else
+  echo "The installed CLI exposes no config validation command" >&2
+  exit 1
+fi
+
 for path in \
   /usr/local/bin/router \
   /usr/local/lib/libcandle_semantic_router.so \
