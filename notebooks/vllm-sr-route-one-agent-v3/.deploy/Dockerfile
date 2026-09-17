@@ -41,10 +41,10 @@ RUN apt-get update \
         tini \
     && rm -rf /var/lib/apt/lists/*
 
+COPY .deploy/vllm_sr-0.3.0-py3-none-any.whl /tmp/vllm_sr-0.3.0-py3-none-any.whl
 RUN python3 -m venv /opt/workshop-venv \
     && /opt/workshop-venv/bin/pip install --no-cache-dir --upgrade pip \
     && test -n "${VLLM_SR_CONTRACT_REVISION}" \
-    && test -n "${VLLM_SR_PYTHON_SPEC}" \
     && test -n "${VLLM_SR_PYTHON_REVISION}" \
     && test "${VLLM_SR_CONTRACT_REVISION}" = "${VLLM_SR_PYTHON_REVISION}" \
     && if [ "${ALLOW_UNPINNED_IMAGES}" != "1" ]; then \
@@ -53,7 +53,8 @@ RUN python3 -m venv /opt/workshop-venv \
          case "${DASHBOARD_IMAGE}" in *@sha256:*) ;; *) echo "DASHBOARD_IMAGE must use an immutable digest" >&2; exit 1;; esac; \
        fi \
     && /opt/workshop-venv/bin/pip install --no-cache-dir \
-        "${VLLM_SR_PYTHON_SPEC}"
+        /tmp/vllm_sr-0.3.0-py3-none-any.whl \
+    && rm /tmp/vllm_sr-0.3.0-py3-none-any.whl
 
 COPY .deploy/requirements.txt /tmp/workshop-requirements.txt
 RUN /opt/workshop-venv/bin/pip install --no-cache-dir \
