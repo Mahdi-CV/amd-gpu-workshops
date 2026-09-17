@@ -75,6 +75,62 @@ else
 fi
 wait_http "routed model" "${ROUTER_API}/v1/models"
 
+# Patch dashboard frontend for /app/{pod}/ nginx proxy prefix.
+# Instead of rewriting every JS file, inject a single shim script into
+# index.html that transparently handles three things:
+#   1. URL.prototype.pathname override — strips /app/{pod} so the SPA
+#      router sees clean paths (/, /dashboard, /setup, etc.)
+#   2. fetch() interceptor — routes /api/* and /embedded/* through the
+#      proxy prefix so requests hit the dashboard-backend via nginx
+#   3. history.pushState/replaceState interceptor — keeps SPA navigation
+#      URLs under /app/{pod}/ so browser refresh still works
+# HTML asset refs (href, src) are also made relative (./) so static
+# resources load through the proxy prefix.
+_dashboard_frontend="/opt/vllm-sr/frontend"
+if [[ -f "${_dashboard_frontend}/index.html" ]] \
+  && ! grep -q '__vsr_subpath_shim' "${_dashboard_frontend}/index.html" 2>/dev/null; then
+  # Make HTML asset references relative
+  sed -i 's|href="/|href="./|g; s|src="/|src="./|g' \
+    "${_dashboard_frontend}/index.html"
+  # Inject subpath shim before the main module script
+  python3 - "${_dashboard_frontend}/index.html" << 'PYSHIM'
+import sys
+path = sys.argv[1]
+html = open(path).read()
+shim = r'''<script data-id="__vsr_subpath_shim">
+(function(){
+  var m=location.pathname.match(/^(\/app\/[^\/]+)(\/.*)?$/);
+  if(!m)return;
+  var base=m[1];
+  /* 1. URL.prototype.pathname: strip /app/{pod} for SPA route matching */
+  var d=Object.getOwnPropertyDescriptor(URL.prototype,"pathname");
+  Object.defineProperty(URL.prototype,"pathname",{get:function(){
+    var p=d.get.call(this);
+    if(this.origin===location.origin){
+      if(p.startsWith(base+"/"))return p.slice(base.length)||"/";
+      if(p===base)return "/";
+    }return p;},set:d.set,configurable:true});
+  /* 2. fetch: route /api/ and /embedded/ through proxy prefix */
+  var F=window.fetch;
+  window.fetch=function(i,o){
+    if(typeof i==="string"){
+      if(i.startsWith("/api/")||i.startsWith("/embedded/"))i=base+i;
+    }return F.call(this,i,o);};
+  /* 3. history: keep SPA navigation under /app/{pod}/ */
+  ["pushState","replaceState"].forEach(function(fn){
+    var orig=history[fn].bind(history);
+    history[fn]=function(s,t,u){
+      if(typeof u==="string"&&u.startsWith("/")&&!u.startsWith(base)
+         &&!u.startsWith("/api/")&&!u.startsWith("/embedded/"))u=base+u;
+      return orig(s,t,u);};});
+})();
+</script>
+    '''
+html = html.replace('<script type="module"', shim + '<script type="module"', 1)
+open(path, 'w').write(html)
+PYSHIM
+fi
+
 if [[ -f "${STATE_DIR}/dashboard.pid" ]] \
   && kill -0 "$(cat "${STATE_DIR}/dashboard.pid")" 2>/dev/null; then
   echo "✓ Dashboard already running"
