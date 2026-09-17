@@ -237,6 +237,7 @@ class WorkshopLab:
                 f"{response.text[:2000]}"
             )
         body = response.json()
+        message = body.get("choices", [{}])[0].get("message", {})
         return {
             "requested_model": model,
             "response_model": body.get("model"),
@@ -248,10 +249,33 @@ class WorkshopLab:
             ),
             "replay_id": response.headers.get("x-vsr-replay-id"),
             "latency_seconds": round(elapsed, 3),
-            "answer": body.get("choices", [{}])[0]
-            .get("message", {})
-            .get("content"),
+            "answer": message.get("content") or message.get("reasoning") or "",
         }
+
+    def active_config(self) -> dict:
+        """Return the Router's currently active canonical configuration."""
+        response = requests.get(
+            f"{self.management_api.rstrip('/')}/api/v1/config",
+            timeout=15,
+        )
+        if not response.ok:
+            raise RuntimeError(
+                f"Could not read active Router configuration "
+                f"(HTTP {response.status_code}):\n{response.text[:2000]}"
+            )
+        return response.json()
+
+    def active_decisions(self) -> list[str]:
+        config = self.active_config()
+        decisions = config.get("routing", {}).get("decisions", [])
+        return [
+            decision.get("name")
+            for decision in decisions
+            if decision.get("name")
+        ]
+
+    def decision_is_active(self, name: str) -> bool:
+        return name in self.active_decisions()
 
     def direct_model_check(self, lane: str) -> dict:
         if lane == "routine":
