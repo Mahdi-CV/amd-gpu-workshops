@@ -211,25 +211,41 @@ class WorkshopLab:
         return discovered
 
     @staticmethod
+    def _answer_text(message: dict) -> str:
+        content = message.get("content")
+        if isinstance(content, str) and content.strip():
+            return content
+        if message.get("reasoning") or message.get("reasoning_content"):
+            return (
+                "[The model completed reasoning but did not return final "
+                "answer text within this response limit.]"
+            )
+        return "[The model returned no answer text.]"
+
+    @staticmethod
     def _chat(
         endpoint: str,
         model: str,
         prompt: str,
         max_tokens: int,
         debug: bool = False,
+        extra_body: dict | None = None,
     ) -> dict:
         headers = {"content-type": "application/json"}
         if debug:
             headers["x-vsr-debug"] = "true"
+        payload = {
+            "model": model,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+        }
+        if extra_body:
+            payload.update(extra_body)
         started = time.perf_counter()
         response = requests.post(
             f"{endpoint.rstrip('/')}/v1/chat/completions",
             headers=headers,
-            json={
-                "model": model,
-                "messages": [{"role": "user", "content": prompt}],
-                "max_tokens": max_tokens,
-            },
+            json=payload,
             timeout=650,
         )
         elapsed = time.perf_counter() - started
@@ -251,7 +267,7 @@ class WorkshopLab:
             ),
             "replay_id": response.headers.get("x-vsr-replay-id"),
             "latency_seconds": round(elapsed, 3),
-            "answer": message.get("content") or message.get("reasoning") or "",
+            "answer": WorkshopLab._answer_text(message),
         }
 
     def active_config(self) -> dict:
@@ -284,13 +300,21 @@ class WorkshopLab:
             endpoint = self.routine_endpoint
             model = self.routine_provider_model
             prompt = "Reply with exactly: routine model ready"
+            extra_body = None
         elif lane == "reasoning":
             endpoint = self.reasoning_endpoint
             model = self.reasoning_provider_model
             prompt = "Reply with exactly: reasoning model ready"
+            extra_body = {"chat_template_kwargs": {"enable_thinking": False}}
         else:
             raise ValueError("lane must be 'routine' or 'reasoning'")
-        result = self._chat(endpoint, model, prompt, max_tokens=32)
+        result = self._chat(
+            endpoint,
+            model,
+            prompt,
+            max_tokens=32,
+            extra_body=extra_body,
+        )
         print(pformat(result))
         return result
 
@@ -334,7 +358,7 @@ class WorkshopLab:
             )
         body = response.json()
         message = body.get("choices", [{}])[0].get("message", {})
-        answer = message.get("content") or message.get("reasoning") or ""
+        history_answer = message.get("content") or ""
         observed = {
             "prompt": prompt,
             "matched_complexity": response.headers.get(
@@ -343,7 +367,7 @@ class WorkshopLab:
             "decision": response.headers.get("x-vsr-selected-decision"),
             "selected_model": response.headers.get("x-vsr-selected-model"),
             "replay_id": response.headers.get("x-vsr-replay-id"),
-            "answer": answer,
+            "answer": self._answer_text(message),
         }
         print(
             pformat(
@@ -356,7 +380,10 @@ class WorkshopLab:
                 }
             )
         )
-        return [*messages, {"role": "assistant", "content": answer}], observed
+        return [
+            *messages,
+            {"role": "assistant", "content": history_answer},
+        ], observed
 
     def compare_predictions(self, prompts: list[dict[str, str]]) -> list[dict]:
         """Route learner-authored prompts and compare predictions to evidence."""
