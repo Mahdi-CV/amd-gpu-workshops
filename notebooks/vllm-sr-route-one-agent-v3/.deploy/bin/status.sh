@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source /opt/workshop/config/environment.env
+
 check() {
   local name=$1
   local url=$2
@@ -11,11 +13,11 @@ check() {
   fi
 }
 
-check "routine model" "http://127.0.0.1:8002/v1/models"
-check "reasoning model" "http://127.0.0.1:8001/v1/models"
-check "semantic router" "http://127.0.0.1:8898/v1/models"
-check "router management" "http://127.0.0.1:8080/health"
-check "dashboard" "http://127.0.0.1:8700/"
+check "routine model" "${ROUTINE_ENDPOINT}/v1/models"
+check "reasoning model" "${REASONING_ENDPOINT}/v1/models"
+check "semantic router" "${ROUTER_API}/v1/models"
+check "router management" "${ROUTER_MANAGEMENT_API}/health"
+check "dashboard" "${DASHBOARD_URL}/"
 
 if command -v hermes >/dev/null 2>&1; then
   printf '✓ %-20s ready\n' "Hermes"
