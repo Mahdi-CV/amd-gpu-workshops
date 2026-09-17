@@ -76,56 +76,73 @@ fi
 wait_http "routed model" "${ROUTER_API}/v1/models"
 
 # Patch dashboard frontend for /app/{pod}/ nginx proxy prefix.
-# Instead of rewriting every JS file, inject a single shim script into
-# index.html that transparently handles three things:
-#   1. URL.prototype.pathname override — strips /app/{pod} so the SPA
-#      router sees clean paths (/, /dashboard, /setup, etc.)
-#   2. fetch() interceptor — routes /api/* and /embedded/* through the
-#      proxy prefix so requests hit the dashboard-backend via nginx
-#   3. history.pushState/replaceState interceptor — keeps SPA navigation
-#      URLs under /app/{pod}/ so browser refresh still works
-# HTML asset refs (href, src) are also made relative (./) so static
-# resources load through the proxy prefix.
+# Two-part fix:
+#   1. Patch the main JS bundle to pass basename to React Router's
+#      BrowserRouter — this makes the SPA router strip /app/{pod}/ from
+#      location.pathname when matching routes, so /app/{pod}/dashboard
+#      correctly matches the /dashboard route.  React Router also prepends
+#      basename when pushing history, so SPA navigation stays under the
+#      proxy prefix.
+#   2. Inject a small inline shim into index.html that:
+#      a. Sets window.__VSR_BASE = "/app/{pod}" (read by the patched
+#         BrowserRouter basename)
+#      b. Intercepts fetch() so all server requests (e.g. /api/setup/state,
+#         /wasm_exec.js) are routed through /app/{pod}/… via the proxy.
+# HTML asset refs (href, src) are made relative (./) so static resources
+# resolve against the current document URL (/app/{pod}/), which the proxy
+# forwards to the dashboard-backend.
 _dashboard_frontend="/opt/vllm-sr/frontend"
 if [[ -f "${_dashboard_frontend}/index.html" ]] \
   && ! grep -q '__vsr_subpath_shim' "${_dashboard_frontend}/index.html" 2>/dev/null; then
   # Make HTML asset references relative
   sed -i 's|href="/|href="./|g; s|src="/|src="./|g' \
     "${_dashboard_frontend}/index.html"
-  # Inject subpath shim before the main module script
+
+  # Patch BrowserRouter to read basename from window.__VSR_BASE.
+  # The main bundle renders: (0,N.jsx)(h,{children:…  (h = BrowserRouter)
+  # We inject: basename:window.__VSR_BASE||"/"
+  _main_js=$(ls "${_dashboard_frontend}"/assets/index-*.js 2>/dev/null | head -1)
+  if [[ -n "${_main_js}" ]]; then
+    python3 -c "
+p='${_main_js}';j=open(p).read()
+j=j.replace('(0,N.jsx)(h,{children:','(0,N.jsx)(h,{basename:window.__VSR_BASE||\"\/\",children:',1)
+open(p,'w').write(j)
+"
+  fi
+
+  # Patch the Vite/Rolldown chunk-path resolver in the vendor bundle.
+  # The original prepends "/" making chunk URLs absolute to root.
+  # We prepend __VSR_BASE so chunks route through /app/{pod}/ proxy.
+  _vendor_js=$(ls "${_dashboard_frontend}"/assets/react-vendor-*.js 2>/dev/null | head -1)
+  if [[ -n "${_vendor_js}" ]]; then
+    python3 -c "
+p='${_vendor_js}';j=open(p).read();bt=chr(96)
+old='p=function(e){return'+bt+'/'+bt+'+e}'
+new='p=function(e){return(window.__VSR_BASE||'+bt+bt+')+'+bt+'/'+bt+'+e}'
+j=j.replace(old,new,1)
+open(p,'w').write(j)
+"
+  fi
+
+  # Inject fetch-intercept shim (no replaceState — URL stays at /app/{pod}/).
   python3 - "${_dashboard_frontend}/index.html" << 'PYSHIM'
 import sys
 path = sys.argv[1]
 html = open(path).read()
-shim = r'''<script data-id="__vsr_subpath_shim">
-(function(){
-  var m=location.pathname.match(/^(\/app\/[^\/]+)(\/.*)?$/);
-  if(!m)return;
-  var base=m[1];
-  /* 1. URL.prototype.pathname: strip /app/{pod} for SPA route matching */
-  var d=Object.getOwnPropertyDescriptor(URL.prototype,"pathname");
-  Object.defineProperty(URL.prototype,"pathname",{get:function(){
-    var p=d.get.call(this);
-    if(this.origin===location.origin){
-      if(p.startsWith(base+"/"))return p.slice(base.length)||"/";
-      if(p===base)return "/";
-    }return p;},set:d.set,configurable:true});
-  /* 2. fetch: route /api/ and /embedded/ through proxy prefix */
-  var F=window.fetch;
-  window.fetch=function(i,o){
-    if(typeof i==="string"){
-      if(i.startsWith("/api/")||i.startsWith("/embedded/"))i=base+i;
-    }return F.call(this,i,o);};
-  /* 3. history: keep SPA navigation under /app/{pod}/ */
-  ["pushState","replaceState"].forEach(function(fn){
-    var orig=history[fn].bind(history);
-    history[fn]=function(s,t,u){
-      if(typeof u==="string"&&u.startsWith("/")&&!u.startsWith(base)
-         &&!u.startsWith("/api/")&&!u.startsWith("/embedded/"))u=base+u;
-      return orig(s,t,u);};});
-})();
-</script>
-    '''
+shim = '<script data-id="__vsr_subpath_shim">\n'
+shim += '(function(){\n'
+shim += '  var m=location.pathname.match(/^\\/app\\/[^\\/]+/);\n'
+shim += '  if(!m)return;\n'
+shim += '  var base=m[0];\n'
+shim += '  window.__VSR_BASE=base;\n'
+shim += '  var F=window.fetch;\n'
+shim += '  window.fetch=function(i,o){\n'
+shim += '    if(typeof i==="string"&&/^\\/(?!app\\/)/.test(i))\n'
+shim += '      i=base+i;\n'
+shim += '    return F.call(this,i,o);\n'
+shim += '  };\n'
+shim += '})();\n'
+shim += '</script>\n'
 html = html.replace('<script type="module"', shim + '<script type="module"', 1)
 open(path, 'w').write(html)
 PYSHIM
