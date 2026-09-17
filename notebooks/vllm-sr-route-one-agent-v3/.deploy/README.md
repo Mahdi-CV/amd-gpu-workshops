@@ -6,6 +6,33 @@ This directory contains the hidden deployment assets for the
 Do not publish an image until its CLI, Router, Dashboard, model images, writable
 workspace, and complete notebook flow have passed the checks below.
 
+## Kubernetes branch conventions
+
+This branch runs Dashboard on container port `9000`. When Jupyter Server Proxy
+provides browser access, use:
+
+```text
+DASHBOARD_URL=http://127.0.0.1:9000
+DASHBOARD_BROWSER_URL=/proxy/9000/
+```
+
+If the event platform supplies a dedicated application URL, set
+`DASHBOARD_BROWSER_URL` to that URL instead.
+
+The Kubernetes manifest mounts the complete `/workspace` directory from one
+writable `emptyDir`. Keep that directory mount. Do not replace it with a
+single-file `subPath` mount for `router.yaml`.
+
+Before building, choose and document one model-cache strategy:
+
+- prewarmed PVC: set `HF_HOME` to the mounted cache path and ensure every model
+  and Router classifier asset is present before the pod starts; or
+- image-baked cache: keep `HF_HOME` at the baked cache path and remove the
+  unused model-cache PVC from the manifest.
+
+Do not publish a manifest that mounts `/models` while the image uses a
+different undocumented cache location.
+
 ## 1. Build one coherent Semantic Router stack
 
 Choose one immutable Semantic Router Git revision:

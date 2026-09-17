@@ -38,12 +38,12 @@ spec:
                   name: vllm-sr-agent-workshop
                   key: dashboard-jwt-secret
             - name: DASHBOARD_BROWSER_URL
-              value: /proxy/8700/
+              value: /proxy/9000/
           ports:
             - name: jupyter
               containerPort: 8888
             - name: dashboard
-              containerPort: 8700
+              containerPort: 9000
           resources:
             requests:
               amd.com/gpu: "1"
