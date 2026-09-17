@@ -189,24 +189,25 @@ curl --fail http://127.0.0.1:8001/v1/models
 Then generate one short completion from each. Do not continue until direct
 generation succeeds.
 
-The notebook's first code cell now loads the hidden environment helper and
-reports:
+The notebook's first code cell loads the hidden environment helper, starts the
+routing platform, and reports:
 
 ```text
 GPU                  ready  AMD Instinct MI300
 routine model        ready
 reasoning model      ready
-semantic router      stopped or ready
+semantic router      ready
 dashboard            ready
 hermes               ready  model=vllm-sr/auto
 ```
 
-## 2. Start the routing platform
+## 2. Explain the running routing platform
 
-Run the next notebook cell:
+The first notebook code cell runs:
 
 ```python
 services = lab.start_platform()
+services = lab.status()
 ```
 
 The cell starts and wires:

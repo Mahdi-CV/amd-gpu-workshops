@@ -206,11 +206,11 @@ HERMES_BASE_URL=http://127.0.0.1:8898/v1
 HERMES_MODEL=vllm-sr/auto
 ```
 
-The participant runs `lab.start_platform()` in the notebook. The helper returns
-immediately when the platform is healthy; otherwise it invokes
-`/opt/workshop/bin/start-platform.sh`. The script reads this file and passes
-values directly to each platform process. Environment variables are documented
-but not typed during the workshop.
+The participant runs `lab.start_platform()` in the first notebook code cell.
+The helper returns immediately when the platform is healthy; otherwise it
+invokes `/opt/workshop/bin/start-platform.sh`. The script reads this file and
+passes values directly to each platform process. Environment variables are
+documented but not typed during the workshop.
 
 The model-serving variables are loaded into every Jupyter terminal through the
 image's shell profile so participants can run the two real `vllm serve`
@@ -397,7 +397,7 @@ Participant commands:
 1. the displayed routine-model `vllm serve` command
 2. the displayed reasoning-model `vllm serve` command
 3. direct backend verification
-4. the notebook cell `services = lab.start_platform()`
+4. the first notebook code cell, which runs `services = lab.start_platform()`
 
 `start-platform.sh`:
 
