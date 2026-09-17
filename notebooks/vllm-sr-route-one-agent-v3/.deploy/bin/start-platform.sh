@@ -76,21 +76,24 @@ fi
 wait_http "routed model" "${ROUTER_API}/v1/models"
 
 # Patch dashboard frontend for /app/{pod}/ nginx proxy prefix.
-# Two-part fix:
-#   1. Patch the main JS bundle to pass basename to React Router's
-#      BrowserRouter — this makes the SPA router strip /app/{pod}/ from
-#      location.pathname when matching routes, so /app/{pod}/dashboard
-#      correctly matches the /dashboard route.  React Router also prepends
-#      basename when pushing history, so SPA navigation stays under the
-#      proxy prefix.
-#   2. Inject a small inline shim into index.html that:
-#      a. Sets window.__VSR_BASE = "/app/{pod}" (read by the patched
-#         BrowserRouter basename)
-#      b. Intercepts fetch() so all server requests (e.g. /api/setup/state,
-#         /wasm_exec.js) are routed through /app/{pod}/… via the proxy.
-# HTML asset refs (href, src) are made relative (./) so static resources
-# resolve against the current document URL (/app/{pod}/), which the proxy
-# forwards to the dashboard-backend.
+#
+# The dashboard is a React SPA that assumes it runs at "/". Behind nginx's
+# /app/{pod}/ reverse-proxy every absolute URL (API calls, lazy-loaded CSS/JS
+# chunks, WASM assets, dynamic <script>/<link> elements) must be rewritten to
+# include the proxy prefix.
+#
+# Three patches applied at first boot:
+#   1. BrowserRouter basename — makes React Router strip the prefix from
+#      location.pathname so /app/{pod}/dashboard matches the /dashboard route.
+#   2. Vite chunk resolver — the vendored p() prepends "/" to chunk filenames;
+#      patched to prepend __VSR_BASE+"/" instead.
+#   3. Inline shim in index.html — sets window.__VSR_BASE, then monkey-patches
+#      fetch(), HTMLLinkElement.prototype.href setter,
+#      HTMLScriptElement.prototype.src setter, and Element.prototype.setAttribute
+#      so every absolute-path resource request routes through the proxy.
+#
+# HTML asset refs (href, src) are also made relative (./) so the initial
+# script/css tags resolve against the document URL (/app/{pod}/).
 _dashboard_frontend="/opt/vllm-sr/frontend"
 if [[ -f "${_dashboard_frontend}/index.html" ]] \
   && ! grep -q '__vsr_subpath_shim' "${_dashboard_frontend}/index.html" 2>/dev/null; then
@@ -98,54 +101,75 @@ if [[ -f "${_dashboard_frontend}/index.html" ]] \
   sed -i 's|href="/|href="./|g; s|src="/|src="./|g' \
     "${_dashboard_frontend}/index.html"
 
-  # Patch BrowserRouter to read basename from window.__VSR_BASE.
-  # The main bundle renders: (0,N.jsx)(h,{children:…  (h = BrowserRouter)
-  # We inject: basename:window.__VSR_BASE||"/"
-  _main_js=$(ls "${_dashboard_frontend}"/assets/index-*.js 2>/dev/null | head -1)
-  if [[ -n "${_main_js}" ]]; then
-    python3 -c "
-p='${_main_js}';j=open(p).read()
-j=j.replace('(0,N.jsx)(h,{children:','(0,N.jsx)(h,{basename:window.__VSR_BASE||\"\/\",children:',1)
-open(p,'w').write(j)
-"
-  fi
+  # Apply all JS + HTML patches via a single Python script.
+  python3 - "${_dashboard_frontend}" << 'PATCH_ALL'
+import sys, os, glob, re
 
-  # Patch the Vite/Rolldown chunk-path resolver in the vendor bundle.
-  # The original prepends "/" making chunk URLs absolute to root.
-  # We prepend __VSR_BASE so chunks route through /app/{pod}/ proxy.
-  _vendor_js=$(ls "${_dashboard_frontend}"/assets/react-vendor-*.js 2>/dev/null | head -1)
-  if [[ -n "${_vendor_js}" ]]; then
-    python3 -c "
-p='${_vendor_js}';j=open(p).read();bt=chr(96)
-old='p=function(e){return'+bt+'/'+bt+'+e}'
-new='p=function(e){return(window.__VSR_BASE||'+bt+bt+')+'+bt+'/'+bt+'+e}'
-j=j.replace(old,new,1)
-open(p,'w').write(j)
-"
-  fi
+frontend = sys.argv[1]
+assets   = os.path.join(frontend, "assets")
 
-  # Inject fetch-intercept shim (no replaceState — URL stays at /app/{pod}/).
-  python3 - "${_dashboard_frontend}/index.html" << 'PYSHIM'
-import sys
-path = sys.argv[1]
-html = open(path).read()
-shim = '<script data-id="__vsr_subpath_shim">\n'
-shim += '(function(){\n'
-shim += '  var m=location.pathname.match(/^\\/app\\/[^\\/]+/);\n'
-shim += '  if(!m)return;\n'
-shim += '  var base=m[0];\n'
-shim += '  window.__VSR_BASE=base;\n'
-shim += '  var F=window.fetch;\n'
-shim += '  window.fetch=function(i,o){\n'
-shim += '    if(typeof i==="string"&&/^\\/(?!app\\/)/.test(i))\n'
-shim += '      i=base+i;\n'
-shim += '    return F.call(this,i,o);\n'
-shim += '  };\n'
-shim += '})();\n'
-shim += '</script>\n'
+# --- Patch 1: BrowserRouter basename ---
+for main_js in glob.glob(os.path.join(assets, "index-*.js")):
+    js = open(main_js).read()
+    old = "(0,N.jsx)(h,{children:"
+    new = '(0,N.jsx)(h,{basename:window.__VSR_BASE||"/",children:'
+    if old in js:
+        js = js.replace(old, new, 1)
+        open(main_js, "w").write(js)
+        print(f"  patch-1 basename  -> {os.path.basename(main_js)}")
+
+# --- Patch 2: Vite chunk resolver p() ---
+bt = chr(96)  # backtick
+for vendor_js in glob.glob(os.path.join(assets, "react-vendor-*.js")):
+    js = open(vendor_js).read()
+    old = f"p=function(e){{return{bt}/{bt}+e}}"
+    new = f"p=function(e){{return(window.__VSR_BASE||{bt}{bt})+{bt}/{bt}+e}}"
+    if old in js:
+        js = js.replace(old, new, 1)
+        open(vendor_js, "w").write(js)
+        print(f"  patch-2 chunk-resolver -> {os.path.basename(vendor_js)}")
+
+# --- Patch 3: comprehensive inline shim ---
+html_path = os.path.join(frontend, "index.html")
+html = open(html_path).read()
+# The shim intercepts:
+#  a) fetch()                          — API calls, WASM fetches
+#  b) HTMLLinkElement.prototype.href   — CSS preloads from Vite lazy loader
+#  c) HTMLScriptElement.prototype.src  — dynamic <script> elements (wasm_exec)
+#  d) Element.prototype.setAttribute   — fallback for any other href/src sets
+shim_lines = [
+    '<script data-id="__vsr_subpath_shim">',
+    "(function(){",
+    "  var m=location.pathname.match(/^\\/app\\/[^\\/]+/);",
+    "  if(!m)return;",
+    "  var base=m[0];",
+    "  window.__VSR_BASE=base;",
+    '  function needs(u){return typeof u==="string"&&u.charAt(0)==="/"&&u.indexOf("/app/")!==0;}',
+    "  var F=window.fetch;",
+    "  window.fetch=function(i,o){if(needs(i))i=base+i;return F.call(this,i,o);};",
+    "  function patchSetter(proto,attr){",
+    "    var d=Object.getOwnPropertyDescriptor(proto,attr);",
+    "    if(!d||!d.set)return;",
+    "    Object.defineProperty(proto,attr,{",
+    "      set:function(v){if(needs(v))v=base+v;d.set.call(this,v);},",
+    "      get:d.get,enumerable:d.enumerable,configurable:true",
+    "    });",
+    "  }",
+    '  patchSetter(HTMLLinkElement.prototype,"href");',
+    '  patchSetter(HTMLScriptElement.prototype,"src");',
+    "  var origSet=Element.prototype.setAttribute;",
+    "  Element.prototype.setAttribute=function(name,val){",
+    '    if((name==="href"||name==="src")&&needs(val))val=base+val;',
+    "    return origSet.call(this,name,val);",
+    "  };",
+    "})();",
+    "<" + "/script>",
+]
+shim = "\n".join(shim_lines) + "\n"
 html = html.replace('<script type="module"', shim + '<script type="module"', 1)
-open(path, 'w').write(html)
-PYSHIM
+open(html_path, "w").write(html)
+print("  patch-3 shim -> index.html")
+PATCH_ALL
 fi
 
 if [[ -f "${STATE_DIR}/dashboard.pid" ]] \
