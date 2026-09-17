@@ -202,6 +202,27 @@ routine    ['gemma-4-12b']
 reasoning  ['qwen3.8-27b']
 ```
 
+Run the first notebook code cell after both model servers are ready:
+
+```python
+import importlib
+import workshop_lab
+
+importlib.reload(workshop_lab)
+lab = workshop_lab.lab
+lab.welcome()
+services = lab.start_platform()
+services = lab.status()
+```
+
+Expected platform status:
+
+```text
+semantic router     ready
+router management   ready
+dashboard           ready
+```
+
 The direct reasoning readiness check disables thinking and should print:
 
 ```text
@@ -211,33 +232,20 @@ reasoning model ready
 Presenter message:
 
 ```text
-At this point there is no routing. We have verified two independent vLLM
-backends.
+The two direct checks bypass routing. They prove both vLLM backends work before
+we send application traffic through the shared endpoint.
 ```
 
 ### Section 2: Set Up vLLM Semantic Router with Two Models
 
-Explain that the class will use a prebuilt policy before reconstructing it.
+The first code cell already started the prebuilt policy. Explain what it
+connected before moving to the Dashboard.
 
 Say:
 
 ```text
 We will use the working router first. In Section 7, we will rebuild the same
 pattern from the smallest configuration.
-```
-
-Run:
-
-```python
-services = lab.start_platform()
-```
-
-Expected:
-
-```text
-semantic router     ready
-router management   ready
-dashboard           ready
 ```
 
 ### Section 3: vLLM Semantic Router Dashboard Demo
