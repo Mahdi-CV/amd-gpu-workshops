@@ -4,6 +4,8 @@ ARG VLLM_BASE_IMAGE
 ARG VLLM_SR_IMAGE
 ARG DASHBOARD_IMAGE
 ARG VLLM_SR_CONTRACT_REVISION
+ARG VLLM_SR_PYTHON_REVISION
+ARG ALLOW_UNPINNED_IMAGES=0
 
 FROM ${VLLM_SR_IMAGE} AS router
 FROM ${DASHBOARD_IMAGE} AS dashboard
@@ -12,12 +14,20 @@ FROM envoyproxy/envoy:v1.34-latest AS envoy
 FROM ${VLLM_BASE_IMAGE}
 
 ARG SOURCE_REVISION=unavailable
+ARG VLLM_BASE_IMAGE
+ARG VLLM_SR_IMAGE
+ARG DASHBOARD_IMAGE
 ARG VLLM_SR_CONTRACT_REVISION
 ARG VLLM_SR_PYTHON_SPEC
+ARG VLLM_SR_PYTHON_REVISION
+ARG ALLOW_UNPINNED_IMAGES
 
 LABEL org.opencontainers.image.title="vLLM-SR Route One Agent Workshop"
 LABEL org.opencontainers.image.revision="${SOURCE_REVISION}"
 LABEL ai.vllm.semantic-router.revision="${VLLM_SR_CONTRACT_REVISION}"
+LABEL ai.vllm.semantic-router.python-revision="${VLLM_SR_PYTHON_REVISION}"
+LABEL ai.vllm.semantic-router.router-image="${VLLM_SR_IMAGE}"
+LABEL ai.vllm.semantic-router.dashboard-image="${DASHBOARD_IMAGE}"
 
 USER root
 
@@ -35,15 +45,31 @@ RUN python3 -m venv /opt/workshop-venv \
     && /opt/workshop-venv/bin/pip install --no-cache-dir --upgrade pip \
     && test -n "${VLLM_SR_CONTRACT_REVISION}" \
     && test -n "${VLLM_SR_PYTHON_SPEC}" \
+    && test -n "${VLLM_SR_PYTHON_REVISION}" \
+    && test "${VLLM_SR_CONTRACT_REVISION}" = "${VLLM_SR_PYTHON_REVISION}" \
+    && if [ "${ALLOW_UNPINNED_IMAGES}" != "1" ]; then \
+         case "${VLLM_BASE_IMAGE}" in *@sha256:*) ;; *) echo "VLLM_BASE_IMAGE must use an immutable digest" >&2; exit 1;; esac; \
+         case "${VLLM_SR_IMAGE}" in *@sha256:*) ;; *) echo "VLLM_SR_IMAGE must use an immutable digest" >&2; exit 1;; esac; \
+         case "${DASHBOARD_IMAGE}" in *@sha256:*) ;; *) echo "DASHBOARD_IMAGE must use an immutable digest" >&2; exit 1;; esac; \
+       fi \
     && /opt/workshop-venv/bin/pip install --no-cache-dir \
         "${VLLM_SR_PYTHON_SPEC}"
 
 COPY .deploy/requirements.txt /tmp/workshop-requirements.txt
 RUN /opt/workshop-venv/bin/pip install --no-cache-dir \
       -r /tmp/workshop-requirements.txt \
+    && /opt/workshop-venv/bin/python3 -c \
+      'import click, jinja2, jsonschema, pydantic, requests, yaml; import cli.commands.runtime_support' \
     && rm /tmp/workshop-requirements.txt
 
 COPY --from=router /usr/local/bin/router /usr/local/bin/router
+COPY --from=router /usr/local/lib/libcandle_semantic_router.so /usr/local/lib/
+COPY --from=router /usr/local/lib/libnlp_binding.so /usr/local/lib/
+COPY --from=router /usr/local/lib/libonnx_semantic_router.so /usr/local/lib/
+COPY --from=router /usr/local/lib/libml_semantic_router.so /usr/local/lib/
+COPY --from=router /usr/local/lib/libonnxruntime_providers_shared.so /usr/local/lib/
+COPY --from=router /usr/local/lib/libonnxruntime.so.1.22.0 /usr/local/lib/
+RUN ldconfig
 COPY --from=dashboard /app/dashboard-backend /opt/vllm-sr/dashboard-backend
 COPY --from=dashboard /app/frontend /opt/vllm-sr/frontend
 COPY --from=envoy /usr/local/bin/envoy /usr/local/bin/envoy
@@ -51,6 +77,10 @@ COPY --from=envoy /usr/local/bin/envoy /usr/local/bin/envoy
 RUN printf '%s\n' \
       "VLLM_SR_CONTRACT_REVISION=${VLLM_SR_CONTRACT_REVISION}" \
       "VLLM_SR_PYTHON_SPEC=${VLLM_SR_PYTHON_SPEC}" \
+      "VLLM_SR_PYTHON_REVISION=${VLLM_SR_PYTHON_REVISION}" \
+      "VLLM_BASE_IMAGE=${VLLM_BASE_IMAGE}" \
+      "VLLM_SR_IMAGE=${VLLM_SR_IMAGE}" \
+      "DASHBOARD_IMAGE=${DASHBOARD_IMAGE}" \
       > /opt/vllm-sr-contract.env
 
 COPY .deploy /opt/workshop/deploy
