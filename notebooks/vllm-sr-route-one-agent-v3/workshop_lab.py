@@ -618,25 +618,6 @@ class WorkshopLab:
         if not self.vllm_sr_bin:
             raise RuntimeError("The vllm-sr CLI is not installed.")
 
-        candidate = yaml.safe_load(config_path.read_text(encoding="utf-8"))
-        providers = candidate.setdefault("providers", {})
-        models = providers.get("models", [])
-        if not models:
-            raise RuntimeError(
-                f"Configuration has no provider models: {config_path}"
-            )
-
-        # Compatibility for the development CLI. The canonical file remains
-        # unchanged because the Router rejects this deprecated field.
-        providers.setdefault("defaults", {})["default_model"] = models[0]["name"]
-        compatibility_path = config_path.with_name(
-            f".{config_path.stem}-cli-check.yaml"
-        )
-        compatibility_path.write_text(
-            yaml.safe_dump(candidate, sort_keys=False),
-            encoding="utf-8",
-        )
-
         command_candidates = (
             [self.vllm_sr_bin, "config", "validate"],
             [self.vllm_sr_bin, "validate"],
@@ -656,20 +637,57 @@ class WorkshopLab:
             None,
         )
         if validate_command is None:
-            compatibility_path.unlink(missing_ok=True)
             raise RuntimeError(
                 "The installed vllm-sr CLI exposes no config validation command."
             )
 
-        try:
-            result = subprocess.run(
-                [*validate_command, "--config", str(compatibility_path)],
-                check=False,
-                capture_output=True,
-                text=True,
+        result = subprocess.run(
+            [*validate_command, "--config", str(config_path)],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        combined = "\n".join(
+            part for part in (result.stdout, result.stderr) if part
+        )
+        old_cli_default_error = (
+            "Default model 'None' not found in models" in combined
+            or "providers.defaults.default_model" in combined
+        )
+
+        if result.returncode and old_cli_default_error:
+            candidate = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            providers = candidate.setdefault("providers", {})
+            models = providers.get("models", [])
+            if not models:
+                raise RuntimeError(
+                    f"Configuration has no provider models: {config_path}"
+                )
+
+            providers.setdefault("defaults", {})["default_model"] = models[0][
+                "name"
+            ]
+            compatibility_path = config_path.with_name(
+                f".{config_path.stem}-cli-check.yaml"
             )
-        finally:
-            compatibility_path.unlink(missing_ok=True)
+            compatibility_path.write_text(
+                yaml.safe_dump(candidate, sort_keys=False),
+                encoding="utf-8",
+            )
+            try:
+                result = subprocess.run(
+                    [
+                        *validate_command,
+                        "--config",
+                        str(compatibility_path),
+                    ],
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+            finally:
+                compatibility_path.unlink(missing_ok=True)
 
         if result.returncode:
             combined = "\n".join(
