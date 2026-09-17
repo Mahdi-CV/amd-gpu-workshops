@@ -534,6 +534,57 @@ class WorkshopLab:
                 f"Last Router output:\n{tail}"
             )
 
+    def validate_config(self, config_path: Path) -> None:
+        """Validate canonical YAML and require a Router boot when available."""
+        if not self.vllm_sr_bin:
+            raise RuntimeError("The vllm-sr CLI is not installed.")
+
+        candidate = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+        providers = candidate.setdefault("providers", {})
+        models = providers.get("models", [])
+        if not models:
+            raise RuntimeError(
+                f"Configuration has no provider models: {config_path}"
+            )
+
+        # Compatibility for the development CLI. The canonical file remains
+        # unchanged because the Router rejects this deprecated field.
+        providers.setdefault("defaults", {})["default_model"] = models[0]["name"]
+        compatibility_path = config_path.with_name(
+            f".{config_path.stem}-cli-check.yaml"
+        )
+        compatibility_path.write_text(
+            yaml.safe_dump(candidate, sort_keys=False),
+            encoding="utf-8",
+        )
+
+        try:
+            result = subprocess.run(
+                [
+                    self.vllm_sr_bin,
+                    "validate",
+                    "--config",
+                    str(compatibility_path),
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+            )
+        finally:
+            compatibility_path.unlink(missing_ok=True)
+
+        if result.returncode:
+            combined = "\n".join(
+                part for part in (result.stdout, result.stderr) if part
+            )
+            raise RuntimeError(
+                f"Configuration validation failed for {config_path.name}:\n"
+                f"{combined}"
+            )
+
+        print(f"✓ Configuration validated: {config_path.name}")
+        self.boot_check(config_path, required=True)
+
     def run_agent(self, task: str, exercise_dir: Path) -> dict:
         hermes = shutil.which("hermes")
         if not hermes:
