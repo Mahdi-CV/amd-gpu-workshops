@@ -87,6 +87,25 @@ The resulting image records all inputs in:
 /opt/vllm-sr-contract.env
 ```
 
+### Validated Semantic Router inputs
+
+The full image build and notebook acceptance run completed successfully with:
+
+```text
+VLLM_SR_CONTRACT_REVISION=c1e00bb0fada18b891cbe20afb663b201cad0cb6
+VLLM_SR_PYTHON_REVISION=c1e00bb0fada18b891cbe20afb663b201cad0cb6
+VLLM_SR_PYTHON_SPEC=git+https://github.com/vllm-project/semantic-router.git@c1e00bb0fada18b891cbe20afb663b201cad0cb6#subdirectory=src/vllm-sr
+VLLM_SR_IMAGE=ghcr.io/vllm-project/semantic-router/vllm-sr@sha256:8f157696dc6d15862eda67908c06e1736a8ee57bdac0fb336f165a8ff8d1e916
+DASHBOARD_IMAGE=ghcr.io/vllm-project/semantic-router/dashboard@sha256:0eda445f2af832f209df5963dd13370dcfa100da286cba3b5cffef0bdfc49d86
+```
+
+The Router image's embedded CLI source and the Dashboard image metadata both
+match `c1e00bb0fada18b891cbe20afb663b201cad0cb6`.
+
+The MI300 base used for the reference build was a local image. Replace
+`VLLM_BASE_IMAGE` with the immutable digest of the ROCm/vLLM base published for
+the Kubernetes environment.
+
 ## 3. Known invalid combination
 
 Do not reproduce this previously deployed combination:
@@ -123,7 +142,7 @@ Dashboard image:
 ghcr.io/vllm-project/semantic-router/dashboard@sha256:0eda445f2af832f209df5963dd13370dcfa100da286cba3b5cffef0bdfc49d86
 
 CLI source:
-4f39c04647408e0b1600d8596f9473b34d52efd8
+c1e00bb0fada18b891cbe20afb663b201cad0cb6
 ```
 
 Expected Router runtime MD5 fingerprints for that exact Router image:
