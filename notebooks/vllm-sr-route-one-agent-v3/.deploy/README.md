@@ -6,6 +6,12 @@ This directory contains the hidden deployment assets for the
 Do not publish an image until its CLI, Router, Dashboard, model images, writable
 workspace, and complete notebook flow have passed the checks below.
 
+Presenter delivery instructions are in:
+
+```text
+.deploy/PRESENTER-GUIDE.md
+```
+
 ## 1. Build one coherent Semantic Router stack
 
 Choose one immutable Semantic Router Git revision:
