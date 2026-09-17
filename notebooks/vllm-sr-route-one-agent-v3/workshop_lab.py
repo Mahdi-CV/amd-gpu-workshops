@@ -86,6 +86,7 @@ class WorkshopLab:
             or shutil.which("vllm-sr")
             or (str(bundled_cli) if bundled_cli.exists() else None)
         )
+        self._boot_skip_reported = False
 
     def welcome(self) -> None:
         print("Route One Agent Across Two Models")
@@ -441,9 +442,16 @@ class WorkshopLab:
                     "VLLM_SR_ALLOW_SKIP_BOOT_CHECK=1 in a development-only "
                     "environment."
                 )
-            print("! ROUTER BOOT CHECK SKIPPED")
-            print("  No Router binary is available in this environment.")
-            print("  Do not publish a workshop image with this opt-out enabled.")
+            if not self._boot_skip_reported:
+                print(
+                    "○ Runtime boot checks are unavailable in this split "
+                    "development environment."
+                )
+                print(
+                    "  The published workshop image must bundle the Router "
+                    "and pass these checks."
+                )
+                self._boot_skip_reported = True
             return False
 
         config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
