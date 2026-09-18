@@ -116,6 +116,24 @@ def wait_for_decision(name: str, present: bool = True) -> None:
     )
 
 
+def wait_for_decision_set(expected: set[str]) -> None:
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        config, _ = current_config()
+        actual = {
+            item.get("name")
+            for item in config.get("routing", {}).get("decisions", [])
+            if item.get("name")
+        }
+        if actual == expected:
+            return
+        time.sleep(1)
+    raise RuntimeError(
+        "Timed out waiting for baseline decisions to be restored: "
+        f"expected={sorted(expected)}"
+    )
+
+
 def replace_once(source: str, old: str, new: str) -> str:
     if old not in source:
         raise RuntimeError(f"Expected notebook text not found: {old}")
@@ -175,6 +193,7 @@ def main() -> None:
     )
 
     baseline: dict | None = None
+    baseline_decisions: set[str] | None = None
     stage5_activated = False
     challenge_activated = False
 
@@ -238,11 +257,30 @@ def main() -> None:
 
                 if "services = lab.start_platform()" in cell.source:
                     baseline, _ = current_config()
+                    baseline_decisions = {
+                        item.get("name")
+                        for item in baseline.get("routing", {}).get(
+                            "decisions", []
+                        )
+                        if item.get("name")
+                    }
                     print("PASS baseline Router configuration captured")
 
                 if "incident_signal = {" in cell.source:
                     stage5_path = root / "generated-config/05-incident-policy.yaml"
+                    stage5_import_path = (
+                        root / "generated-config/05-incident-routing.yaml"
+                    )
                     stage5 = yaml.safe_load(stage5_path.read_text())
+                    stage5_import = yaml.safe_load(stage5_import_path.read_text())
+                    if set(stage5_import) != {"routing"}:
+                        raise RuntimeError(
+                            "Stage 5 Dashboard import must contain only routing"
+                        )
+                    if stage5_import["routing"] != stage5["routing"]:
+                        raise RuntimeError(
+                            "Stage 5 Dashboard routing does not match full policy"
+                        )
                     mutate_config("PATCH", {"routing": stage5["routing"]})
                     wait_for_decision("incident-fast-lane")
                     stage5_activated = True
@@ -301,7 +339,8 @@ def main() -> None:
     finally:
         if baseline is not None:
             mutate_config("PUT", baseline)
-            wait_for_decision("incident-fast-lane", present=False)
+            if baseline_decisions is not None:
+                wait_for_decision_set(baseline_decisions)
             response = requests.get(f"{ROUTER}/v1/models", timeout=30)
             response.raise_for_status()
             print("PASS original Router configuration restored")

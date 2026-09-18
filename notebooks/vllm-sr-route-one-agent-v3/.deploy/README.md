@@ -211,6 +211,69 @@ rename config.yaml.tmp config.yaml: device or resource busy
 The active source configuration, Dashboard `-config` path, and Router
 `-config` path must all refer to the same writable file.
 
+### Dashboard runtime config path contract
+
+The Dashboard process must receive both config-path environment variables:
+
+```text
+VLLM_SR_SOURCE_CONFIG_PATH
+VLLM_SR_RUNTIME_CONFIG_PATH
+```
+
+For the single-container workshop image, both should point to:
+
+```text
+/workspace/generated-config/router.yaml
+```
+
+The Dashboard `-config` argument and the Router `-config` argument must point to
+that same file.
+
+For a split-container deployment, the paths may differ between containers, but
+each path must resolve to the same shared writable config artifact through the
+mounted directory.
+
+If `VLLM_SR_RUNTIME_CONFIG_PATH` is missing, Dashboard Deploy and Rollback may
+fall back to:
+
+```text
+/app/config.yaml
+```
+
+and fail with `FileNotFoundError` even though the authored source config exists
+elsewhere.
+
+Verify inside the Dashboard container or pod:
+
+```bash
+printf '%s\n' \
+  "$VLLM_SR_SOURCE_CONFIG_PATH" \
+  "$VLLM_SR_RUNTIME_CONFIG_PATH"
+
+test -f "$VLLM_SR_SOURCE_CONFIG_PATH"
+test -f "$VLLM_SR_RUNTIME_CONFIG_PATH"
+test -w "$(dirname "$VLLM_SR_SOURCE_CONFIG_PATH")"
+```
+
+Image acceptance must include one real Dashboard Deploy and Rollback, followed
+by confirmation that the source file and `/api/v1/config` report the same
+active decisions.
+
+When a workshop exercise changes only routing policy, import a routing-only
+document:
+
+```yaml
+routing:
+  modelCards: []
+  signals: {}
+  decisions: []
+```
+
+Do not import a complete notebook-generated configuration into a differently
+topologized deployment. A complete import can replace the deployment's
+listener, provider endpoint, storage, and service bindings with values intended
+for the notebook container.
+
 ## 6. Verify the image before Kubernetes deployment
 
 Run the built-in static/runtime contract check:

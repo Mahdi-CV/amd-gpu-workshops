@@ -39,6 +39,12 @@ spec:
                   key: dashboard-jwt-secret
             - name: DASHBOARD_BROWSER_URL
               value: /proxy/9000/
+            - name: ROUTER_CONFIG_PATH
+              value: /workspace/generated-config/router.yaml
+            - name: VLLM_SR_SOURCE_CONFIG_PATH
+              value: /workspace/generated-config/router.yaml
+            - name: VLLM_SR_RUNTIME_CONFIG_PATH
+              value: /workspace/generated-config/router.yaml
           ports:
             - name: jupyter
               containerPort: 8888
