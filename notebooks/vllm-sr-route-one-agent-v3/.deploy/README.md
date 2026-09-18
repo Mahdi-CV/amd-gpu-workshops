@@ -18,6 +18,12 @@ Completed participant exercises and their expected results are in:
 .deploy/SOLUTION-KEY.md
 ```
 
+A deferred redesign for the final workshop challenge is captured in:
+
+```text
+.deploy/FINANCIAL-PRIVACY-CHALLENGE-PLAN.md
+```
+
 ## Kubernetes branch conventions
 
 This branch runs Dashboard on container port `9000`. When Jupyter Server Proxy
