@@ -99,6 +99,8 @@ if [[ -f "${STATE_DIR}/dashboard.pid" ]] \
   echo "✓ Dashboard already running"
 else
   ROUTER_CONFIG_PATH="${CONFIG_PATH}" \
+  VLLM_SR_SOURCE_CONFIG_PATH="${CONFIG_PATH}" \
+  VLLM_SR_RUNTIME_CONFIG_PATH="${CONFIG_PATH}" \
   DASHBOARD_CONFIG_DIR="${STATE_DIR}/dashboard" \
   DASHBOARD_AUTH_DB_PATH="${STATE_DIR}/dashboard/auth.db" \
   DASHBOARD_WORKFLOW_DB_PATH="${STATE_DIR}/dashboard/workflow.sqlite" \

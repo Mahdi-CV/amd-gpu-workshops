@@ -33,6 +33,18 @@ if [[ "${VLLM_SR_CONTRACT_REVISION}" != "${VLLM_SR_PYTHON_REVISION}" ]]; then
   exit 1
 fi
 
+expected_config_path=/workspace/generated-config/router.yaml
+for name in \
+  ROUTER_CONFIG_PATH \
+  VLLM_SR_SOURCE_CONFIG_PATH \
+  VLLM_SR_RUNTIME_CONFIG_PATH; do
+  if [[ "${!name:-}" != "${expected_config_path}" ]]; then
+    echo "${name} must be ${expected_config_path}, got ${!name:-<unset>}" >&2
+    exit 1
+  fi
+done
+echo "✓ Dashboard and Router config paths agree"
+
 python3 - <<'PY'
 import click
 import jinja2

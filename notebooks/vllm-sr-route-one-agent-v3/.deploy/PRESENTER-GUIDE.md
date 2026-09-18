@@ -445,7 +445,15 @@ and model.
 
 ### Section 8: Add an Application-Specific Routing Rule
 
-Generate `05-incident-policy.yaml`.
+Generate both incident files:
+
+```text
+05-incident-policy.yaml
+05-incident-routing.yaml
+```
+
+The complete policy is the validation artifact. The routing-only file is the
+Dashboard import and preserves environment-specific provider endpoints.
 
 Point out:
 
@@ -457,8 +465,8 @@ Point out:
 
 Deploy with these exact steps:
 
-1. Open `generated-config/05-incident-policy.yaml` in Jupyter.
-2. Copy all YAML.
+1. Open `generated-config/05-incident-routing.yaml` in Jupyter.
+2. Copy the routing YAML.
 3. Open **Build → Builder**.
 4. Select **Import**.
 5. Paste the YAML.
@@ -466,6 +474,10 @@ Deploy with these exact steps:
 7. Select **Compile**.
 8. Confirm priority 300 and `routine-model`.
 9. Select **Deploy**.
+
+Do not import the complete `05-incident-policy.yaml` into a split-container
+environment. Its provider endpoints describe the notebook's own runtime
+topology and can replace deployment-specific backend addresses.
 
 Before running the collision cell, verify active decisions if needed:
 
