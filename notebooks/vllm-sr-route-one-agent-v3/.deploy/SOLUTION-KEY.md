@@ -116,9 +116,9 @@ routine
 
 ## Section 8 check: deploy the incident policy
 
-After generating the two incident files:
+After generating `generated-config/05-incident-policy.yaml`:
 
-1. Open `generated-config/05-incident-routing.yaml` in Jupyter.
+1. Open the file in Jupyter.
 2. Copy the routing YAML.
 3. Open **Dashboard → Build → Builder**.
 4. Select **Import**.
@@ -129,9 +129,8 @@ After generating the two incident files:
 8. Select **Deploy**.
 9. Return to the notebook and rerun the collision cell.
 
-Use the routing-only file for Dashboard import. The complete
-`05-incident-policy.yaml` is for validation and can contain backend endpoints
-specific to the notebook environment.
+The visible file is routing-only. The complete configuration used by the
+notebook's validation and boot check remains in a hidden internal directory.
 
 Confirm that the policy is active:
 
