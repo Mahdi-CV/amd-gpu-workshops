@@ -268,20 +268,23 @@ def main() -> None:
 
                 if "incident_signal = {" in cell.source:
                     stage5_path = root / "generated-config/05-incident-policy.yaml"
-                    stage5_import_path = (
-                        root / "generated-config/05-incident-routing.yaml"
+                    stage5_validation_path = (
+                        root
+                        / "generated-config/.validation/05-incident-policy.yaml"
                     )
-                    stage5 = yaml.safe_load(stage5_path.read_text())
-                    stage5_import = yaml.safe_load(stage5_import_path.read_text())
-                    if set(stage5_import) != {"routing"}:
+                    stage5_policy = yaml.safe_load(stage5_path.read_text())
+                    stage5_complete = yaml.safe_load(
+                        stage5_validation_path.read_text()
+                    )
+                    if set(stage5_policy) != {"routing"}:
                         raise RuntimeError(
-                            "Stage 5 Dashboard import must contain only routing"
+                            "Stage 5 participant policy must contain only routing"
                         )
-                    if stage5_import["routing"] != stage5["routing"]:
+                    if stage5_policy["routing"] != stage5_complete["routing"]:
                         raise RuntimeError(
-                            "Stage 5 Dashboard routing does not match full policy"
+                            "Stage 5 participant routing does not match validation"
                         )
-                    mutate_config("PATCH", {"routing": stage5["routing"]})
+                    mutate_config("PATCH", stage5_policy)
                     wait_for_decision("incident-fast-lane")
                     stage5_activated = True
                     print("PASS Stage 5 activated")
