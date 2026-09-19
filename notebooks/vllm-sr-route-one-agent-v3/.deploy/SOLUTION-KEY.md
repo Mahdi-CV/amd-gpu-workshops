@@ -160,57 +160,88 @@ selected_model: routine-model
 Both the incident and complexity rules match. Priority 300 wins over priority
 200.
 
-## Section 10 solution: custom policy challenge
+## Section 10 solutions: keep private finance requests local
 
-Replace the participant values with:
+Do not reveal either solution until participants have attempted the challenge.
+Both solutions below satisfy the same behavior-only scorecard.
 
-```python
-MY_KEYWORDS = ["CONFIDENTIAL"]
-MY_ROUTE_NAME = "my-route"
-MY_PRIORITY = 250
-MY_MODEL = "reasoning-model"
+Create this keyword signal in
+**Dashboard → Build → Routing → Signals**:
 
-challenge_prompts = {
-    "positive": "CONFIDENTIAL: summarize this internal deployment note.",
-    "negative": "Define idempotency in one sentence.",
-    "collision": (
-        "CONFIDENTIAL: compare multiple rollout strategies "
-        "and justify the safest plan."
-    ),
-}
-POLICY_IS_PUBLISHED = False
+```yaml
+name: private-financial-data
+operator: OR
+keywords:
+  - PRIVATE
+  - ACCOUNT-ID
+case_sensitive: false
 ```
 
-Run the cell once. It should generate:
+Then use either Solution A or Solution B.
+
+### Solution A: exclude private data from the reasoning decision
+
+Edit `reasoning-lane` under
+**Dashboard → Build → Routing → Decisions** so its rule is:
+
+```yaml
+rules:
+  operator: AND
+  conditions:
+    - type: complexity
+      name: request_complexity:hard
+    - operator: NOT
+      conditions:
+        - type: keyword
+          name: private-financial-data
+```
+
+This keeps the existing decision set small. A hard public request matches
+`reasoning-lane`, while a hard private request is excluded and falls through
+to `routine-lane`.
+
+### Solution B: add a dedicated privacy decision
+
+Leave `reasoning-lane` unchanged and add:
+
+```yaml
+name: private-finance-lane
+description: Keep private financial requests on the local model.
+priority: 300
+rules:
+  operator: AND
+  conditions:
+    - type: keyword
+      name: private-financial-data
+modelRefs:
+  - model: routine-model
+algorithm:
+  type: static
+```
+
+This policy is more explicit. Its higher priority makes the privacy route win
+when a private request is also hard. It is a better shape when privacy traffic
+will later need separate plugins, retention rules, auditing, or other
+route-specific behavior.
+
+### Verify either solution
+
+Compile and deploy the policy, then run the notebook scorecard. Expected:
+
+| Test | Expected model |
+| --- | --- |
+| `public_simple` | `routine-model` |
+| `public_hard` | `reasoning-model` |
+| `private_simple` | `routine-model` |
+| `private_hard` | `routine-model` |
+
+The decision names may differ because the scorecard checks behavior, not one
+specific policy shape.
+
+The final line must be:
 
 ```text
-generated-config/06-my-policy.yaml
-```
-
-Deploy it through **Dashboard → Build → Builder** using the same Import,
-Compile, and Deploy sequence as Section 8.
-
-Then change:
-
-```python
-POLICY_IS_PUBLISHED = True
-```
-
-Rerun the cell. Expected:
-
-| Test | Expected decision | Expected model |
-| --- | --- | --- |
-| positive | `my-route` | `reasoning-model` |
-| negative | `routine-lane` | `routine-model` |
-| collision | `my-route` | `reasoning-model` |
-
-The collision chooses `my-route` because priority 250 is higher than
-`reasoning-lane` priority 200.
-
-The final line should be:
-
-```text
-✓ Positive, negative, and collision checks passed.
+Challenge complete: 4/4 routing checks passed
 ```
 
 ## Full presenter acceptance test
@@ -219,19 +250,20 @@ With both model endpoints and the workshop platform running:
 
 ```bash
 /opt/workshop/bin/verify-image.sh
-
-WORKSHOP_E2E_CONFIRM_MUTATION=1 \
-  python3 /opt/workshop/bin/verify-notebook-e2e.py
 ```
 
-The executed acceptance notebook is saved to:
+Then run the participant notebook from a clean kernel:
 
 ```text
-/workspace/state/acceptance/route-one-agent-e2e.executed.ipynb
+Kernel → Restart Kernel and Run All Cells
 ```
 
-The acceptance script temporarily publishes the incident and custom policies,
-checks their live behavior, and restores the original Router configuration.
+At Section 8, deploy the incident policy and verify the priority result. At
+Section 10, privately apply either solution above and confirm the `4/4`
+scorecard. Restore the original Router configuration after the acceptance run.
+
+The tracked `verify-notebook-e2e.py` still targets the previous challenge and
+is intentionally unchanged in this content-only revision.
 
 ## Recovery and reset
 

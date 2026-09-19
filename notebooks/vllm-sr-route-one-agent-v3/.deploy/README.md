@@ -18,7 +18,7 @@ Completed participant exercises and their expected results are in:
 .deploy/SOLUTION-KEY.md
 ```
 
-A deferred redesign for the final workshop challenge is captured in:
+A deeper follow-up workshop for financial-data policy is captured in:
 
 ```text
 .deploy/FINANCIAL-PRIVACY-CHALLENGE-PLAN.md
@@ -286,22 +286,20 @@ Jupyter             http://127.0.0.1:8888/api
 Do not approve the image based only on health checks or
 `vllm-sr validate`.
 
-With both vLLM model servers and the workshop platform running, execute:
+The tracked `verify-notebook-e2e.py` still targets the earlier generated-policy
+challenge. This content-only revision intentionally leaves test infrastructure
+unchanged, so do not use that script as the final gate for Section 10.
 
-```bash
-WORKSHOP_E2E_CONFIRM_MUTATION=1 \
-  python3 /opt/workshop/bin/verify-notebook-e2e.py
-```
+With both vLLM model servers and the workshop platform running, execute the
+participant notebook from a clean kernel. For the final challenge, privately
+apply either solution from `.deploy/SOLUTION-KEY.md`, run the scorecard, and
+restore the baseline configuration afterward.
 
-This test temporarily deploys Stage 5 and a sample custom route. It restores
-the baseline Router configuration in a `finally` block and writes the executed
-notebook to:
+Do not run `verify-notebook-e2e.py` as the release gate for this notebook
+revision. It still automates the previous challenge contract and is
+intentionally unchanged in this content-only update.
 
-```text
-/workspace/state/acceptance/route-one-agent-e2e.executed.ipynb
-```
-
-Run the notebook from a clean kernel and verify:
+For this notebook revision, verify:
 
 1. Direct calls reach both vLLM backends.
 2. Prompt routing produces routine, reasoning, and uncertain outcomes.
@@ -312,7 +310,8 @@ Run the notebook from a clean kernel and verify:
 7. Stage 5 is imported, compiled, and deployed through Dashboard.
 8. `/api/v1/config/hash` reports identical source, generated, and active hashes.
 9. The collision prompt selects `incident-fast-lane` and `routine-model`.
-10. A completed custom route passes positive, negative, and collision checks.
+10. The private-finance scorecard reports
+    `Challenge complete: 4/4 routing checks passed`.
 11. Router Replay IDs appear and Insights contains the requests.
 12. The baseline configuration is restored after testing.
 

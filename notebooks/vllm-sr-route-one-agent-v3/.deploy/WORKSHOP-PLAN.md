@@ -626,7 +626,7 @@ Clarify:
 - Mixture-of-Experts routes inside one model.
 - Mixture-of-Models coordinates separately deployed models.
 
-Preview—but do not configure:
+Preview, but do not configure:
 
 | Mode | What changes |
 | --- | --- |
@@ -644,75 +644,50 @@ Workshop 2 starts from this point:
 
 End with participants working, not listening.
 
-The guided incident rule showed the mechanics. The challenge asks participants
-to choose a requirement that resembles their own application.
-
-Choose one:
-
-### Coding specialist
+The guided incident rule showed the mechanics. The challenge gives everyone
+the same application requirement and an objective scorecard:
 
 ```text
-If the request asks for code review or debugging,
-use the stronger model.
+Public, reasoning-heavy financial requests may use the larger model.
+Private financial requests must remain on the smaller local model.
 ```
 
-### Privacy boundary
+The two workshop models simulate different deployment boundaries:
+
+| Model | Simulated application role |
+| --- | --- |
+| `routine-model` | Smaller model inside the local data boundary |
+| `reasoning-model` | Larger model treated as an external service |
+
+Participants receive only these implementation hints:
 
 ```text
-If the request contains sensitive data,
-allow only the local model.
+Signals:   Dashboard → Build → Routing → Signals
+Decisions: Dashboard → Build → Routing → Decisions
 ```
 
-### Long-context lane
+They must add a signal, then either update an existing decision or create a new
+one. The four scorecard prompts provide the clues needed to choose the signal
+details and rule structure.
+
+The notebook checks only the selected model:
+
+| Request | Required model |
+| --- | --- |
+| Public simple | `routine-model` |
+| Public hard | `reasoning-model` |
+| Private simple | `routine-model` |
+| Private hard | `routine-model` |
+
+The route is complete only when the scorecard prints:
 
 ```text
-If the request exceeds the routine model's safe context,
-use the long-context-capable model.
+Challenge complete: 4/4 routing checks passed
 ```
 
-### Conservative quality policy
-
-```text
-If complexity is medium or hard,
-use the reasoning model.
-```
-
-### Participant-defined requirement
-
-Write one routing requirement from your own application. The instructor checks
-that it is observable and testable before implementation.
-
-Participants must produce:
-
-1. a one-sentence application requirement;
-2. the signal or signals that represent it;
-3. the decision and model assignment;
-4. the intended priority relative to existing decisions;
-5. one positive test that should match;
-6. one negative test that should not match;
-7. one collision test in which multiple policies match;
-8. Playground or API results; and
-9. an Insights trace explaining the winner.
-
-The route is not complete merely because one demonstration prompt works.
-Participants should explain:
-
-- why they chose the signal;
-- what false positive would look like;
-- what false negative would look like;
-- why the selected priority is correct; and
-- whether an uncertain request should favor cost, latency, privacy, or quality.
-
-Each participant finishes with:
-
-```text
-requirement
-→ signal
-→ decision
-→ priority
-→ model
-→ test evidence
-```
+Presenters keep two supported policy designs in `.deploy/SOLUTION-KEY.md`.
+Do not expose the signal keywords or rule tree before participants attempt the
+challenge.
 
 ---
 
@@ -728,7 +703,7 @@ requirement
 | 18 min | Rebuild the route incrementally |
 | 9 min | Guided application-specific customization |
 | 5 min | Select-mode MoM and Workshop 2 preview |
-| 10 min | Participant-designed routing challenge |
+| 10 min | Private-finance routing challenge |
 
 The challenge can continue as a take-home exercise if the group needs more
 time during model startup or agent execution.
