@@ -293,6 +293,29 @@ Point out:
 - replay ID; and
 - latency.
 
+Before Section 4, run the notebook cell that reads:
+
+```text
+/workspace/generated-config/router.yaml
+```
+
+Show the actual `hard.candidates`, `easy.candidates`, and `threshold`. Explain:
+
+```text
+The candidates are semantic examples, not exact keywords.
+margin = hard score - easy score
+positive beyond the threshold means hard
+negative beyond the threshold means easy
+the middle region means medium
+```
+
+Then connect the signal to the decision condition:
+
+```text
+The signal reports request_complexity:hard.
+The decision condition asks whether that named result matched.
+```
+
 ### Section 4: Test Routing Through the Application API
 
 Have participants provide:
@@ -317,6 +340,16 @@ Say:
 If the router disagrees with your prediction, keep the prompt. It is useful
 calibration data.
 ```
+
+Use one surprising result to explain the refinement order:
+
+1. Improve the candidate examples.
+2. Test positive, negative, and uncertain prompts.
+3. Adjust the threshold only after the examples represent the workload.
+4. Add another condition if complexity cannot express the application rule.
+
+Briefly introduce the practical condition families shown in the notebook.
+Do not walk through the complete Router signal catalog.
 
 ### Section 5: Connect Hermes Agent to vLLM Semantic Router
 
@@ -345,6 +378,14 @@ This section proves that an existing tool-using agent can work through
 vllm-sr/auto without knowing which backend model served the request.
 ```
 
+Add:
+
+```text
+As the policy grows, Hermes still uses the same endpoint. Context, conversation,
+privacy, and application conditions belong in the Router configuration, not in
+the agent.
+```
+
 Do not ask the room to count Hermes internal model calls. Insights inspection
 is optional here.
 
@@ -369,6 +410,18 @@ escalates, while the direct turns remain on the routine path.
 ```
 
 ### Section 7: Build the vLLM Semantic Router Configuration
+
+Use the overview table before opening Stage 1. Emphasize:
+
+```text
+Define a signal.
+Reference it from a decision.
+Assign eligible models.
+Test the observed route.
+```
+
+Show the repository configuration link and decision-rule guide. Do not turn
+this into a complete catalog walkthrough.
 
 Do not read the YAML line by line. Use the “Pay attention to” lists.
 
@@ -459,6 +512,13 @@ Point out:
 - priority 300; and
 - `routine-model`.
 
+Clarify the two operator levels:
+
+```text
+OR inside the keyword signal means any listed phrase can match that signal.
+AND inside the decision combines named signal conditions.
+```
+
 Deploy with these exact steps:
 
 1. Open `generated-config/05-incident-policy.yaml` in Jupyter.
@@ -521,29 +581,56 @@ Mixture of Experts routes inside one model.
 
 Preview Cascade, Fusion, and Workflow as follow-up material.
 
-### Section 10: Build a Custom vLLM Semantic Router Policy
+### Section 10: Keep Private Finance Requests Local
 
-If time allows, give participants five minutes to define:
+Frame the two existing models as application roles:
 
-- one keyword signal;
-- one decision;
-- one priority;
-- one positive prompt;
-- one negative prompt; and
-- one collision prompt.
+```text
+routine-model   smaller model inside the simulated local boundary
+reasoning-model larger model treated as an external service
+```
 
-If behind schedule, explain the challenge and assign it as follow-up work.
+Remind the room that both models are physically local in this workshop.
+
+Give only these participant hints:
+
+```text
+Signals:   Dashboard → Build → Routing → Signals
+Decisions: Dashboard → Build → Routing → Decisions
+```
+
+Tell participants:
+
+- a signal alone does not change routing;
+- they may update an existing decision or create a new one;
+- the four test prompts contain the evidence they need; and
+- the scorecard, not one particular policy shape, decides whether they pass.
+
+Do not reveal the keywords or either solution before participants attempt the
+challenge. Both supported solutions are documented in the presenter-only
+solution key.
+
+Completion requires:
+
+```text
+Challenge complete: 4/4 routing checks passed
+```
+
+If behind schedule, provide the signal keywords as the first hint. Give the
+decision design only as the second hint.
 
 ## Expected route reference
 
 | Demonstration | Expected decision | Expected model |
 | --- | --- | --- |
-| HTTP definition | `routine-traffic` | `routine-model` |
-| Hard distributed-queue diagnosis | `escalate-hard-prompts` | `reasoning-model` |
-| Multi-turn comparison turn | `escalate-hard-prompts` | `reasoning-model` |
+| HTTP definition | `routine-lane` | `routine-model` |
+| Hard queue diagnosis | `reasoning-lane` | `reasoning-model` |
+| Multi-turn comparison turn | `reasoning-lane` | `reasoning-model` |
 | Incident collision after deploy | `incident-fast-lane` | `routine-model` |
-| Custom positive prompt | participant decision | participant model |
-| Custom negative prompt | another decision | another model |
+| Finance public simple | any valid route | `routine-model` |
+| Finance public hard | any valid route | `reasoning-model` |
+| Finance private simple | any valid route | `routine-model` |
+| Finance private hard | any valid route | `routine-model` |
 
 ## Troubleshooting
 
