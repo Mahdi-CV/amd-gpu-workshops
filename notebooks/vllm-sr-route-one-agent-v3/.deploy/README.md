@@ -117,7 +117,7 @@ docker build \
   --build-arg AMDGPU_TARGETS=gfx1100 \
   --build-arg LLAMA_CPP_TAG=b5604 \
   --build-arg ALLOW_UNPINNED_IMAGES=1 \
-  -t mahatri/vllm-sr-agent-workshop:v3-llamacpp-radeon \
+  -t mahatri/vllm-sr-agent-workshop:v3-radeon-llamacpp \
   .
 ```
 
@@ -178,7 +178,7 @@ Treat that digest as rejected.
 The Radeon Cloud replacement is:
 
 ```text
-mahatri/vllm-sr-agent-workshop:v3-llamacpp-radeon
+mahatri/vllm-sr-agent-workshop:v3-radeon-llamacpp
 ```
 
 ## 4. Reference-node compatibility fingerprints
