@@ -99,6 +99,35 @@ docker build \
   .
 ```
 
+### Radeon Cloud build (llama.cpp + RDNA3)
+
+For Radeon PRO W7900 / W7900D (gfx1100) on Radeon Cloud, the image uses
+llama-server (llama.cpp) instead of vLLM for model serving. The Dockerfile
+builds llama.cpp from source with ROCm/HIP support.
+
+```bash
+docker build \
+  -f .deploy/Dockerfile \
+  --build-arg VLLM_BASE_IMAGE=vllm/vllm-openai-rocm:latest \
+  --build-arg VLLM_SR_IMAGE='ghcr.io/vllm-project/semantic-router/vllm-sr@sha256:<digest>' \
+  --build-arg DASHBOARD_IMAGE='ghcr.io/vllm-project/semantic-router/dashboard@sha256:<digest>' \
+  --build-arg VLLM_SR_CONTRACT_REVISION="${VLLM_SR_REVISION}" \
+  --build-arg VLLM_SR_PYTHON_REVISION="${VLLM_SR_REVISION}" \
+  --build-arg VLLM_SR_PYTHON_SPEC='vllm-sr==0.3.0' \
+  --build-arg AMDGPU_TARGETS=gfx1100 \
+  --build-arg LLAMA_CPP_TAG=b5604 \
+  --build-arg ALLOW_UNPINNED_IMAGES=1 \
+  -t mahatri/vllm-sr-agent-workshop:v3-llamacpp-radeon \
+  .
+```
+
+Override `AMDGPU_TARGETS` for other Radeon GPUs (e.g. `gfx1101` for W7800).
+The `LLAMA_CPP_TAG` arg pins the llama.cpp release tag.
+
+The Dockerfile uses a `git-wrapper` and `GH_PROXY_PREFIX` for cloning through
+the Radeon Cloud GitHub proxy. Consult the Radeon Cloud admin for the wrapper
+script and proxy URL before building.
+
 The resulting image records all inputs in:
 
 ```text
@@ -145,6 +174,12 @@ sha256:bc9f8212056d11bc16ffd4937e926b65740d1c6c1a34448ff35d7b3e40654ced
 ```
 
 Treat that digest as rejected.
+
+The Radeon Cloud replacement is:
+
+```text
+mahatri/vllm-sr-agent-workshop:v3-llamacpp-radeon
+```
 
 ## 4. Reference-node compatibility fingerprints
 

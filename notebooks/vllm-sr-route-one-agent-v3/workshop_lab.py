@@ -44,6 +44,19 @@ def _router_port(host: str) -> int:
     return 8898 if _tcp_ready(host, 8898) else 8899
 
 
+def _in_jupyter() -> bool:
+    """Return True when running inside any Jupyter environment."""
+    # Check multiple signals — JUPYTERHUB_SERVICE_PREFIX is NOT set on Radeon Cloud
+    if os.getenv("JPY_PARENT_PID") or os.getenv("JUPYTER_RUNTIME_DIR"):
+        return True
+    try:
+        from IPython import get_ipython
+        ip = get_ipython()
+        return ip is not None and "ZMQ" in type(ip).__name__.upper()
+    except Exception:
+        return False
+
+
 class WorkshopLab:
     def __init__(self) -> None:
         host = _service_host()
@@ -61,6 +74,7 @@ class WorkshopLab:
             "DASHBOARD_BROWSER_URL",
             os.getenv("APP_URL", "http://localhost:9000"),
         )
+        self._is_jupyter = _in_jupyter()
         self.routine_endpoint = os.getenv(
             "ROUTINE_ENDPOINT", f"http://{host}:8002"
         )
@@ -115,7 +129,7 @@ class WorkshopLab:
         for name, url in services.items():
             ready, detail = self._probe(url)
             result[name] = ready
-            marker = "✓" if ready else "○"
+            marker = "+" if ready else "o"
             state = "ready" if ready else "not running"
             print(f"{marker} {name:18} {state:12} {detail}")
         print()
@@ -125,11 +139,83 @@ class WorkshopLab:
         )
         return result
 
+    @staticmethod
+    def _start_background_proxy(
+        name: str,
+        script: Path,
+        check_port: int,
+        log_name: str,
+        pid_name: str,
+        wait_seconds: int = 30,
+    ) -> None:
+        """Start a background Python proxy if not already running."""
+        if _tcp_ready("127.0.0.1", check_port):
+            print(f"  {name} already running on port {check_port}")
+            return
+
+        if not script.is_file():
+            print(f"  WARNING: {script.name} not found, skipping {name}")
+            return
+
+        log_path = Path(f"/workspace/logs/{log_name}")
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(log_path, "w") as log_file:
+            proc = subprocess.Popen(
+                [sys.executable, str(script)],
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
+        pid_file = Path(f"/workspace/state/{pid_name}")
+        pid_file.parent.mkdir(parents=True, exist_ok=True)
+        pid_file.write_text(str(proc.pid))
+
+        for _ in range(wait_seconds * 2):
+            if _tcp_ready("127.0.0.1", check_port):
+                print(f"  {name} started on port {check_port} (PID {proc.pid})")
+                return
+            time.sleep(0.5)
+        print(f"  WARNING: {name} started (PID {proc.pid}) but port {check_port} not ready")
+
+    def _start_openai_proxy(self) -> None:
+        """Start the OpenAI-compatible proxy for llama-server (8001/8002 -> 18001/18002).
+
+        Must run BEFORE start-platform.sh since it waits for models on 8001/8002."""
+        proxy_src = Path("/opt/workshop/bin/openai_proxy.py")
+        # Check both ports — the proxy serves reasoning (8001) and routine (8002)
+        self._start_background_proxy(
+            name="OpenAI proxy",
+            script=proxy_src,
+            check_port=8002,  # routine port starts last (blocking call)
+            log_name="openai-proxy.log",
+            pid_name="openai-proxy.pid",
+            wait_seconds=15,
+        )
+
+    def _apply_proxy_patches(self) -> None:
+        """Start the auth-injecting reverse proxy on port 9001.
+
+        The proxy-aware index.html is shipped in the Docker image at
+        /opt/vllm-sr/frontend/index.html and includes the __vsr_subpath_shim
+        marker so start-platform.sh skips its own patching.  No runtime
+        file copy is needed."""
+        auth_proxy_src = Path("/opt/workshop/bin/dashboard_auth_proxy.py")
+        self._start_background_proxy(
+            name="Auth proxy",
+            script=auth_proxy_src,
+            check_port=9001,
+            log_name="auth-proxy.log",
+            pid_name="auth-proxy.pid",
+        )
+
     def start_platform(self) -> dict[str, bool]:
         router_ready = self._probe(f"{self.router_api}/v1/models")[0]
         dashboard_ready = self._probe(self.dashboard_url)[0]
         if router_ready and dashboard_ready:
             print("The routing platform is already running.")
+            self._start_openai_proxy()
+            if self._is_jupyter:
+                self._apply_proxy_patches()
             return self.status()
 
         script = Path(
@@ -142,6 +228,10 @@ class WorkshopLab:
             print("The routing platform is not ready.")
             print(f"The workshop image must provide: {script}")
             return self.status()
+
+        # Start the OpenAI proxy before start-platform.sh because the script
+        # does wait_http on ports 8001/8002 which the proxy serves.
+        self._start_openai_proxy()
 
         print("Starting the Router, Envoy, and Dashboard...")
         result = subprocess.run(
@@ -161,6 +251,10 @@ class WorkshopLab:
                 f"Platform setup failed with status {result.returncode}"
             )
 
+        # Apply jupyter-server-proxy patches for Radeon Cloud
+        if self._is_jupyter:
+            self._apply_proxy_patches()
+
         services = self.status()
         if not services["semantic router"] or not services["dashboard"]:
             raise RuntimeError(
@@ -173,18 +267,54 @@ class WorkshopLab:
         try:
             from IPython.display import HTML, display
 
-            display(
-                HTML(
-                    f"""
-                    <div style="display:flex;gap:12px;margin:8px 0 16px">
-                      <a href="{self.dashboard_browser_url}" target="_blank"
-                         style="padding:8px 14px;border:1px solid #888;border-radius:6px">
-                        Open vLLM-SR Dashboard
-                      </a>
-                    </div>
-                    """
+            if self._is_jupyter:
+                # Auto-detect the proxy URL from the browser's own location.
+                # Works on any pod/instance without knowing the URL in advance.
+                # The <a> element is created entirely in JS so the href is
+                # correct from creation — JupyterLab sanitises href changes
+                # made after initial render.
+                display(
+                    HTML(
+                        """
+                        <div id="_vsr_dash_box"></div>
+                        <script>
+                        (function() {
+                          var p = window.location.pathname;
+                          var markers = ['/lab', '/tree', '/notebooks', '/voila'];
+                          var base = '';
+                          for (var m = 0; m < markers.length; m++) {
+                            var i = p.indexOf(markers[m]);
+                            if (i > 0) { base = p.substring(0, i); break; }
+                          }
+                          var path = base + '/proxy/9001/';
+                          var url  = window.location.origin + path;
+                          var box  = document.getElementById('_vsr_dash_box');
+                          if (box) {
+                            box.style.cssText = 'display:flex;gap:12px;margin:8px 0 16px';
+                            box.innerHTML =
+                              '<a href="' + url + '" target="_blank" rel="noopener" ' +
+                              'style="padding:8px 14px;border:1px solid #888;border-radius:6px">' +
+                              'Open vLLM-SR Dashboard (' + path + ')' +
+                              '</a>';
+                          }
+                        })();
+                        </script>
+                        """
+                    )
                 )
-            )
+            else:
+                display(
+                    HTML(
+                        f"""
+                        <div style="display:flex;gap:12px;margin:8px 0 16px">
+                          <a href="{self.dashboard_browser_url}" target="_blank"
+                             style="padding:8px 14px;border:1px solid #888;border-radius:6px">
+                            Open vLLM-SR Dashboard
+                          </a>
+                        </div>
+                        """
+                    )
+                )
         except ImportError:
             print("Dashboard:", self.dashboard_browser_url)
 
@@ -497,7 +627,7 @@ class WorkshopLab:
                 )
             if not self._boot_skip_reported:
                 print(
-                    "○ Runtime boot checks are unavailable in this split "
+                    "o Runtime boot checks are unavailable in this split "
                     "development environment."
                 )
                 print(
@@ -568,7 +698,7 @@ class WorkshopLab:
                         lines.append(line)
                         if "startup_complete" in line:
                             print(
-                                f"✓ Router booted {config_path.name} "
+                                f"+ Router booted {config_path.name} "
                                 f"with the bundled runtime"
                             )
                             return True
@@ -611,7 +741,7 @@ class WorkshopLab:
                     f"Router validation rejected {config_path.name}:\n"
                     f"{json.dumps(result, indent=2)}"
                 )
-            print(f"✓ Configuration validated: {config_path.name}")
+            print(f"+ Configuration validated: {config_path.name}")
             self.boot_check(config_path, required=True)
             return
 
@@ -698,7 +828,7 @@ class WorkshopLab:
                 f"{combined}"
             )
 
-        print(f"✓ Configuration validated: {config_path.name}")
+        print(f"+ Configuration validated: {config_path.name}")
         self.boot_check(config_path, required=True)
 
     def run_agent(self, task: str, exercise_dir: Path) -> dict:

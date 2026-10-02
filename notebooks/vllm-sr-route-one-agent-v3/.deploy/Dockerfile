@@ -33,12 +33,15 @@ USER root
 
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        cmake \
         curl \
         git \
         patch \
         procps \
         ripgrep \
         tini \
+    && update-ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
 COPY .deploy/vllm_sr-0.3.0-py3-none-any.whl /tmp/vllm_sr-0.3.0-py3-none-any.whl
@@ -57,7 +60,7 @@ RUN python3 -m venv /opt/workshop-venv \
     && rm /tmp/vllm_sr-0.3.0-py3-none-any.whl
 
 COPY .deploy/requirements.txt /tmp/workshop-requirements.txt
-RUN /opt/workshop-venv/bin/pip install --no-cache-dir \
+RUN /opt/workshop-venv/bin/pip install --no-cache-dir --ignore-requires-python \
       -r /tmp/workshop-requirements.txt \
     && /opt/workshop-venv/bin/python3 -c \
       'import click, jinja2, jsonschema, pydantic, requests, yaml; import cli.commands.runtime_support' \
@@ -74,6 +77,14 @@ RUN ldconfig
 COPY --from=dashboard /app/dashboard-backend /opt/vllm-sr/dashboard-backend
 COPY --from=dashboard /app/frontend /opt/vllm-sr/frontend
 COPY --from=envoy /usr/local/bin/envoy /usr/local/bin/envoy
+
+# Radeon Cloud: proxy-aware dashboard frontend for jupyter-server-proxy
+# index.html lives in .deploy/ so it is hidden from notebook users.
+# It includes the __vsr_subpath_shim marker so start-platform.sh skips
+# its own Instinct-style patching.
+COPY .deploy/index.html /opt/vllm-sr/frontend/index.html
+COPY .deploy/dashboard_auth_proxy.py /opt/workshop/bin/dashboard_auth_proxy.py
+COPY .deploy/openai_proxy.py /opt/workshop/bin/openai_proxy.py
 
 RUN printf '%s\n' \
       "VLLM_SR_CONTRACT_REVISION=${VLLM_SR_CONTRACT_REVISION}" \
@@ -124,7 +135,28 @@ ENV PATH="/opt/workshop-venv/bin:${PATH}" \
     VLLM_ROCM_USE_AITER="1" \
     VLLM_ROCM_USE_AITER_FUSION_SHARED_EXPERTS="1"
 
-EXPOSE 8888 9000
+COPY .deploy/git-wrapper /usr/local/bin/git
+RUN chmod +x /usr/local/bin/git && /usr/local/bin/git --version
+ENV GH_PROXY_PREFIX="https://gh-test.anruicloud.com/"
+
+# Build llama.cpp with ROCm/HIP support for llama-server
+# AMDGPU_TARGETS must match the GPU: gfx1100 = Radeon PRO W7900 (RDNA3)
+ARG LLAMA_CPP_TAG=b5604
+ARG AMDGPU_TARGETS=gfx1100
+RUN /usr/local/bin/git clone --depth 1 --branch "${LLAMA_CPP_TAG}" \
+      https://github.com/ggerganov/llama.cpp.git /usr/local/bin/llama.cpp \
+    && cmake -B /usr/local/bin/llama.cpp/build \
+        -S /usr/local/bin/llama.cpp \
+        -DGGML_HIP=ON \
+        -DAMDGPU_TARGETS="${AMDGPU_TARGETS}" \
+        -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build /usr/local/bin/llama.cpp/build \
+        --target llama-server \
+        --config Release \
+        -j"$(nproc)" \
+    && /usr/local/bin/llama.cpp/build/bin/llama-server --version
+
+EXPOSE 8888 9000 9001
 
 WORKDIR /workspace
 

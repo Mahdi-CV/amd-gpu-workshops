@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <script data-id="__vsr_subpath_shim">
+    (function() {
+      function getProxyBase() {
+        var p = window.location.pathname;
+        var m = p.match(/\/proxy\/\d+/);
+        if (m) return p.substring(0, m.index + m[0].length + 1);
+        return '';
+      }
+      var PROXY_BASE = getProxyBase();
+
+      var ORIGIN = window.location.origin;
+      function rewriteUrl(url) {
+        if (typeof url !== 'string' || !PROXY_BASE) return url;
+        // Absolute path: /assets/foo.css → /instances/.../proxy/9001/assets/foo.css
+        if (url.startsWith('/') && !url.startsWith(PROXY_BASE)) {
+          return PROXY_BASE + url.substring(1);
+        }
+        // Full same-origin URL: https://host/assets/foo.css → https://host/instances/.../proxy/9001/assets/foo.css
+        if (url.startsWith(ORIGIN + '/') && url.indexOf(PROXY_BASE) === -1) {
+          return ORIGIN + PROXY_BASE + url.substring(ORIGIN.length + 1);
+        }
+        return url;
+      }
+
+      // Intercept fetch — rewrite URLs, inject auth, and fake /api/auth/me if needed
+      var origFetch = window.fetch;
+      window.fetch = function(url, opts) {
+        if (typeof url === 'string') url = rewriteUrl(url);
+        else if (url instanceof Request) {
+          var u = new URL(url.url);
+          var rw = rewriteUrl(u.pathname);
+          if (rw !== u.pathname) { u.pathname = rw; url = new Request(u.toString(), url); }
+        }
+        var resolvedUrl = (typeof url === 'string') ? url : (url instanceof Request ? url.url : '');
+
+        // Inject Authorization header for API calls
+        if (PROXY_BASE && resolvedUrl.indexOf('/api/') !== -1) {
+          var t = localStorage.getItem('token');
+          if (t) {
+            opts = opts || {};
+            opts.headers = new Headers(opts.headers || {});
+            if (!opts.headers.has('Authorization')) {
+              opts.headers.set('Authorization', 'Bearer ' + t);
+            }
+          }
+        }
+
+        // jupyter-server-proxy strips Authorization headers, so /api/auth/me always 401s.
+        // Intercept the response: if it's a 401 on an auth/me endpoint AND we have user data, fake a 200.
+        if (PROXY_BASE && resolvedUrl.indexOf('/api/auth/me') !== -1) {
+          var storedUser = localStorage.getItem('user');
+          var storedToken = localStorage.getItem('token');
+          if (storedUser && storedToken) {
+            return origFetch.call(this, url, opts).then(function(resp) {
+              if (resp.ok) return resp; // backend accepted it, use real response
+              console.log('[proxy-auth] /api/auth/me returned', resp.status, '— injecting cached user');
+              var userData = JSON.parse(storedUser);
+              var body = JSON.stringify({ user: userData, token: storedToken });
+              return new Response(body, {
+                status: 200,
+                statusText: 'OK',
+                headers: { 'Content-Type': 'application/json' }
+              });
+            });
+          }
+        }
+
+        return origFetch.call(this, url, opts);
+      };
+
+      // Intercept XMLHttpRequest — rewrite URLs and inject auth token
+      var origXHR = XMLHttpRequest.prototype.open;
+      var origXHRSend = XMLHttpRequest.prototype.send;
+      var origSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
+      XMLHttpRequest.prototype.open = function(method, url) {
+        this._vsrUrl = url;
+        this._vsrHasAuth = false;
+        var args = Array.prototype.slice.call(arguments);
+        args[1] = rewriteUrl(url);
+        return origXHR.apply(this, args);
+      };
+      XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+        if (name.toLowerCase() === 'authorization') this._vsrHasAuth = true;
+        return origSetRequestHeader.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function() {
+        var self = this;
+        if (PROXY_BASE && !this._vsrHasAuth && this._vsrUrl && this._vsrUrl.indexOf('/api/') !== -1) {
+          var t = localStorage.getItem('token');
+          if (t) origSetRequestHeader.call(this, 'Authorization', 'Bearer ' + t);
+        }
+        // For /api/auth/me via XHR: if 401, override with cached user data
+        if (PROXY_BASE && this._vsrUrl && this._vsrUrl.indexOf('/api/auth/me') !== -1) {
+          var storedUser = localStorage.getItem('user');
+          var storedToken = localStorage.getItem('token');
+          if (storedUser && storedToken) {
+            this.addEventListener('load', function() {
+              if (self.status === 401) {
+                console.log('[proxy-auth] XHR /api/auth/me returned 401 — overriding');
+                var body = JSON.stringify({ user: JSON.parse(storedUser), token: storedToken });
+                Object.defineProperty(self, 'status', { value: 200 });
+                Object.defineProperty(self, 'statusText', { value: 'OK' });
+                Object.defineProperty(self, 'responseText', { value: body });
+                Object.defineProperty(self, 'response', { value: body });
+              }
+            });
+          }
+        }
+        return origXHRSend.apply(this, arguments);
+      };
+
+      // Set <base> tag so that document.baseURI points to the proxy path.
+      // This makes CSS/chunk resolution (new URL('./chunk.css', document.baseURI))
+      // resolve through the proxy.
+      if (PROXY_BASE) {
+        var baseEl = document.createElement('base');
+        baseEl.href = PROXY_BASE;
+        document.head.prepend(baseEl);
+        console.log('[proxy] Set <base href="' + PROXY_BASE + '">');
+
+        // Tell BrowserRouter to strip the proxy prefix from location.pathname
+        // before matching routes. start-platform.sh patches the JS bundle to
+        // use window.__VSR_BASE as BrowserRouter's basename prop.
+        window.__VSR_BASE = PROXY_BASE.replace(/\/$/, '');
+        console.log('[proxy] Set __VSR_BASE="' + window.__VSR_BASE + '"');
+      }
+
+      // Do NOT rewrite pushState/replaceState — React Router needs clean paths
+      // like /dashboard to match its routes. Chrome does not allow overriding
+      // Location.prototype.pathname, so we can't strip the proxy prefix from
+      // reads. The trade-off: the URL bar shows /dashboard (outside proxy) after
+      // SPA navigation, but the page still works because no reload occurs.
+      // Asset resolution is handled by <base>, URL constructor intercept, and
+      // eager CSS preloads.
+
+      // Intercept dynamic element src/href via setAttribute
+      var origSetAttr = Element.prototype.setAttribute;
+      Element.prototype.setAttribute = function(name, value) {
+        if ((name === 'src' || name === 'href') && typeof value === 'string') {
+          value = rewriteUrl(value);
+        }
+        return origSetAttr.call(this, name, value);
+      };
+
+      // Intercept .src property setter on script, img, etc.
+      ['HTMLScriptElement', 'HTMLImageElement', 'HTMLSourceElement', 'HTMLMediaElement', 'HTMLIFrameElement'].forEach(function(cls) {
+        var proto = window[cls] && window[cls].prototype;
+        if (!proto) return;
+        var desc = Object.getOwnPropertyDescriptor(proto, 'src');
+        if (desc && desc.set) {
+          var origSet = desc.set;
+          Object.defineProperty(proto, 'src', {
+            set: function(v) { origSet.call(this, rewriteUrl(v)); },
+            get: desc.get,
+            configurable: true,
+            enumerable: true
+          });
+        }
+      });
+
+      // Intercept .href property setter on link elements
+      var linkDesc = Object.getOwnPropertyDescriptor(HTMLLinkElement.prototype, 'href');
+      if (linkDesc && linkDesc.set) {
+        var origLinkSet = linkDesc.set;
+        Object.defineProperty(HTMLLinkElement.prototype, 'href', {
+          set: function(v) { origLinkSet.call(this, rewriteUrl(v)); },
+          get: linkDesc.get,
+          configurable: true,
+          enumerable: true
+        });
+      }
+
+      // Helper: check if a URL needs rewriting (absolute path or full same-origin URL)
+      function needsRewrite(val) {
+        if (!val || !PROXY_BASE) return false;
+        // Absolute path without proxy prefix
+        if (val.startsWith('/') && !val.startsWith(PROXY_BASE)) return true;
+        // Full same-origin URL without proxy prefix
+        if (val.startsWith(ORIGIN + '/') && val.indexOf(PROXY_BASE) === -1) return true;
+        return false;
+      }
+
+      // MutationObserver fallback for any elements we missed
+      if (PROXY_BASE) {
+        new MutationObserver(function(mutations) {
+          mutations.forEach(function(m) {
+            m.addedNodes.forEach(function(node) {
+              if (node.nodeType !== 1) return;
+              var els = [node];
+              if (node.querySelectorAll) els = els.concat(Array.from(node.querySelectorAll('[src],[href]')));
+              els.forEach(function(el) {
+                ['src', 'href'].forEach(function(attr) {
+                  var val = el.getAttribute(attr);
+                  if (needsRewrite(val)) {
+                    origSetAttr.call(el, attr, rewriteUrl(val));
+                  }
+                });
+              });
+            });
+          });
+        }).observe(document.documentElement, { childList: true, subtree: true });
+      }
+
+      // Intercept URL constructor to fix resolution for CSS/chunk preloads.
+      // When the SPA navigates to /dashboard, new URL('./assets/chunk.css', import.meta.url)
+      // may resolve relative to window.location instead of the proxy base, producing
+      // https://host/assets/chunk.css instead of https://host/.../proxy/9001/assets/chunk.css.
+      var OrigURL = window.URL;
+      if (PROXY_BASE) {
+        window.URL = function(url, base) {
+          var result = (arguments.length > 1) ? new OrigURL(url, base) : new OrigURL(url);
+          // If the resolved URL is same-origin and points to /assets/ without proxy prefix, fix it
+          if (result.origin === ORIGIN && result.pathname.startsWith('/assets/') && result.pathname.indexOf(PROXY_BASE) === -1) {
+            return new OrigURL(ORIGIN + PROXY_BASE + result.pathname.substring(1) + result.search + result.hash);
+          }
+          return result;
+        };
+        window.URL.prototype = OrigURL.prototype;
+        window.URL.createObjectURL = OrigURL.createObjectURL;
+        window.URL.revokeObjectURL = OrigURL.revokeObjectURL;
+        // Preserve static methods and properties
+        Object.keys(OrigURL).forEach(function(k) {
+          if (!(k in window.URL)) window.URL[k] = OrigURL[k];
+        });
+      }
+
+      // Intercept WebSocket
+      var OrigWS = window.WebSocket;
+      window.WebSocket = function(url, protocols) {
+        if (typeof url === 'string') {
+          var wsUrl = new OrigURL(url, window.location.href);
+          wsUrl.pathname = rewriteUrl(wsUrl.pathname);
+          url = wsUrl.toString();
+        }
+        return protocols ? new OrigWS(url, protocols) : new OrigWS(url);
+      };
+      window.WebSocket.prototype = OrigWS.prototype;
+
+      // Auto-login: bypass the broken login page entirely
+      (function autoLogin() {
+        if (!PROXY_BASE) return;
+        var onLoginPage = window.location.pathname.indexOf('/login') !== -1
+                       || window.location.pathname.indexOf('/signin') !== -1;
+
+        // Guard against redirect loops: only redirect once per session
+        var redirectKey = '_vsr_autologin_redirected';
+        var alreadyRedirected = sessionStorage.getItem(redirectKey);
+
+        // Step 1: Always try to get a fresh token (synchronous, before React)
+        var loginUrl = PROXY_BASE + 'api/auth/login';
+        var xhr = new XMLHttpRequest();
+        origXHR.call(xhr, 'POST', loginUrl, false);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        var gotToken = false;
+        try {
+          xhr.send(JSON.stringify({email: 'admin@workshop.local', password: 'workshop2026'}));
+          console.log('[auto-login] POST', loginUrl, '→', xhr.status);
+          if (xhr.status === 200) {
+            var resp = JSON.parse(xhr.responseText);
+            console.log('[auto-login] Response keys:', Object.keys(resp));
+            console.log('[auto-login] Full response:', xhr.responseText.substring(0, 500));
+            // Store the ENTIRE response so the SPA can find its own key
+            var token = null;
+            for (var key in resp) {
+              if (resp.hasOwnProperty(key) && typeof resp[key] === 'string' && resp[key].length > 20) {
+                // Likely a token (JWT or similar) — store under its original key AND common aliases
+                token = resp[key];
+                localStorage.setItem(key, token);
+                console.log('[auto-login] Stored localStorage["' + key + '"] (' + token.length + ' chars)');
+              }
+              if (typeof resp[key] === 'object' && resp[key] !== null) {
+                localStorage.setItem(key, JSON.stringify(resp[key]));
+                console.log('[auto-login] Stored localStorage["' + key + '"] (object)');
+              }
+            }
+            if (token) {
+              // Also store under common aliases
+              ['auth_token', 'token', 'access_token', 'jwt_token'].forEach(function(k) {
+                localStorage.setItem(k, token);
+              });
+              document.cookie = 'auth_token=' + token + '; path=/';
+              document.cookie = 'token=' + token + '; path=/';
+              gotToken = true;
+            }
+          }
+        } catch(e) {
+          console.warn('[auto-login] Failed:', e);
+        }
+
+        // Step 2: Redirect away from /login ONCE (only if we got a token and haven't already redirected)
+        if (onLoginPage && gotToken && !alreadyRedirected) {
+          sessionStorage.setItem(redirectKey, '1');
+          console.log('[auto-login] Redirecting to dashboard root');
+          window.location.replace(PROXY_BASE);
+          return; // stop execution, page is navigating
+        }
+
+        // Step 3: If we're on /login and already redirected once, don't loop — let the page render
+        if (onLoginPage && alreadyRedirected) {
+          console.warn('[auto-login] Already redirected once, not looping. Token may not be recognized by the SPA.');
+          console.warn('[auto-login] localStorage keys:', Object.keys(localStorage));
+        }
+      })();
+    })();
+    </script>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="./vllm.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Building Mixture-of-Models: The Next-Generation Model Architecture for Heterogeneous LLM Inference. Make signals and preferences executable." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="vLLM Semantic Router" />
+    <meta property="og:title" content="Build Your Mixture-of-Models | vLLM Semantic Router" />
+    <meta property="og:description" content="Building Mixture-of-Models: The Next-Generation Model Architecture for Heterogeneous LLM Inference. Make signals and preferences executable." />
+    <meta property="og:image" content="https://app.vllm-sr.ai/vllm-sr-logo.social.png" />
+    <meta property="og:image:secure_url" content="https://app.vllm-sr.ai/vllm-sr-logo.social.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="2802" />
+    <meta property="og:image:height" content="1320" />
+    <meta property="og:image:alt" content="vLLM Semantic Router logo" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Build Your Mixture-of-Models | vLLM Semantic Router" />
+    <meta name="twitter:description" content="Building Mixture-of-Models: The Next-Generation Model Architecture for Heterogeneous LLM Inference. Make signals and preferences executable." />
+    <meta name="twitter:image" content="https://app.vllm-sr.ai/vllm-sr-logo.social.png" />
+    <meta name="twitter:image:alt" content="vLLM Semantic Router logo" />
+
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="./manifest.json" />
+
+    <!-- Theme color for mobile browsers -->
+    <meta name="theme-color" content="#050505" />
+
+    <!-- Apple Touch Icon -->
+    <link rel="apple-touch-icon" href="./vllm-mobile.png" />
+
+    <title>Build Your Mixture-of-Models | vLLM Semantic Router</title>
+
+    <!-- Preload WASM compiler for faster init -->
+    <link rel="preload" href="./wasm_exec.js" as="script" />
+    <link rel="preload" href="./signal-compiler.wasm" as="fetch" type="application/wasm" crossorigin />
+    <script type="module" crossorigin src="./assets/index-CY9B-UO1.js"></script>
+    <link rel="modulepreload" crossorigin href="./assets/rolldown-runtime-hePW80VL.js">
+    <link rel="modulepreload" crossorigin href="./assets/react-vendor-DpreT9ib.js">
+    <link rel="stylesheet" crossorigin href="./assets/index-DF8Sko7d.css">
+
+    <!-- Eagerly load route CSS to prevent preload failures through proxy -->
+    <link rel="stylesheet" crossorigin href="./assets/DashboardPage-D4BdufaI.css">
+    <link rel="stylesheet" crossorigin href="./assets/PlaygroundPage-o9wKuzn2.css">
+    <link rel="stylesheet" crossorigin href="./assets/BuilderPage-DUadnpql.css">
+    <link rel="stylesheet" crossorigin href="./assets/StatusPage-B-int5ju.css">
+  </head>
+  <body>
+    <div id="root"></div>
+  </body>
+</html>
