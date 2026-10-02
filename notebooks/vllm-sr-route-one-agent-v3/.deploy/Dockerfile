@@ -138,14 +138,15 @@ ENV PATH="/opt/workshop-venv/bin:${PATH}" \
 # Build llama.cpp with ROCm/HIP support for llama-server
 # AMDGPU_TARGETS must match the GPU: gfx1100 = Radeon PRO W7900 (RDNA3)
 # Clone BEFORE git-wrapper replaces /usr/local/bin/git so we use real git.
-ARG LLAMA_CPP_TAG=b5604
+ARG LLAMA_CPP_TAG=v0.5.0
 ARG AMDGPU_TARGETS=gfx1100
-RUN git clone --depth 1 --branch "${LLAMA_CPP_TAG}" \
-      https://github.com/ggerganov/llama.cpp.git /usr/local/bin/llama.cpp \
+RUN GIT_SSL_NO_VERIFY=true git clone --depth 1 --branch "${LLAMA_CPP_TAG}" \
+      https://github.com/ggml-org/llama.cpp.git /usr/local/bin/llama.cpp \
     && cmake -B /usr/local/bin/llama.cpp/build \
         -S /usr/local/bin/llama.cpp \
         -DGGML_HIP=ON \
         -DAMDGPU_TARGETS="${AMDGPU_TARGETS}" \
+        -DLLAMA_CURL=OFF \
         -DCMAKE_BUILD_TYPE=Release \
     && cmake --build /usr/local/bin/llama.cpp/build \
         --target llama-server \
