@@ -135,15 +135,12 @@ ENV PATH="/opt/workshop-venv/bin:${PATH}" \
     VLLM_ROCM_USE_AITER="1" \
     VLLM_ROCM_USE_AITER_FUSION_SHARED_EXPERTS="1"
 
-COPY .deploy/git-wrapper /usr/local/bin/git
-RUN chmod +x /usr/local/bin/git && /usr/local/bin/git --version
-ENV GH_PROXY_PREFIX="https://gh-test.anruicloud.com/"
-
 # Build llama.cpp with ROCm/HIP support for llama-server
 # AMDGPU_TARGETS must match the GPU: gfx1100 = Radeon PRO W7900 (RDNA3)
+# Clone BEFORE git-wrapper replaces /usr/local/bin/git so we use real git.
 ARG LLAMA_CPP_TAG=b5604
 ARG AMDGPU_TARGETS=gfx1100
-RUN /usr/local/bin/git clone --depth 1 --branch "${LLAMA_CPP_TAG}" \
+RUN git clone --depth 1 --branch "${LLAMA_CPP_TAG}" \
       https://github.com/ggerganov/llama.cpp.git /usr/local/bin/llama.cpp \
     && cmake -B /usr/local/bin/llama.cpp/build \
         -S /usr/local/bin/llama.cpp \
@@ -155,6 +152,10 @@ RUN /usr/local/bin/git clone --depth 1 --branch "${LLAMA_CPP_TAG}" \
         --config Release \
         -j"$(nproc)" \
     && /usr/local/bin/llama.cpp/build/bin/llama-server --version
+
+COPY .deploy/git-wrapper /usr/local/bin/git
+RUN chmod +x /usr/local/bin/git && /usr/local/bin/git --version
+ENV GH_PROXY_PREFIX="https://gh-test.anruicloud.com/"
 
 EXPOSE 8888 9000 9001
 
