@@ -108,7 +108,7 @@ builds llama.cpp from source with ROCm/HIP support.
 ```bash
 docker build \
   -f .deploy/Dockerfile \
-  --build-arg VLLM_BASE_IMAGE=vllm/vllm-openai-rocm:latest \
+  --build-arg VLLM_BASE_IMAGE='rocm/vllm:rocm7.13.0_gfx110X-all_ubuntu24.04_py3.13_pytorch_2.10.0_vllm_0.19.1' \
   --build-arg VLLM_SR_IMAGE='ghcr.io/vllm-project/semantic-router/vllm-sr@sha256:<digest>' \
   --build-arg DASHBOARD_IMAGE='ghcr.io/vllm-project/semantic-router/dashboard@sha256:<digest>' \
   --build-arg VLLM_SR_CONTRACT_REVISION="${VLLM_SR_REVISION}" \
