@@ -26,4 +26,5 @@ exec jupyter lab \
   --notebook-dir=/workspace \
   --ServerApp.allow_remote_access=true \
   --ServerApp.token="${JUPYTER_TOKEN:?JUPYTER_TOKEN is required}" \
+  --ServerApp.terminado_settings='{"shell_command": ["/bin/bash"]}' \
   --allow-root

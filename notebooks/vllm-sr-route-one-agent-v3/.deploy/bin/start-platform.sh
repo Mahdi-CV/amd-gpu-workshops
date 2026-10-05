@@ -7,7 +7,35 @@ STATE_DIR=/workspace/state
 LOG_DIR=/workspace/logs
 CONFIG_PATH=/workspace/generated-config/router.yaml
 
-mkdir -p "${STATE_DIR}" "${LOG_DIR}" /workspace/generated-config /workspace/state/hermes
+CALLER_DIR="$(pwd)"
+cd /workspace
+
+mkdir -p "${STATE_DIR}" "${LOG_DIR}" /workspace/generated-config /workspace/state/hermes /models "$PWD/models"
+ln -sfn /models/Vela-1.0-Encoder-307M-Embedding "$PWD/models/Vela-1.0-Encoder-307M-Embedding"
+
+# Also symlink in the caller's original CWD — the router may inherit that
+# directory instead of /workspace when launched from the notebook.
+if [[ "${CALLER_DIR}" != "$PWD" ]]; then
+  mkdir -p "${CALLER_DIR}/models"
+  ln -sfn /models/Vela-1.0-Encoder-307M-Embedding "${CALLER_DIR}/models/Vela-1.0-Encoder-307M-Embedding"
+fi
+
+# Check if a PID file holds a live process matching the expected binary name.
+# Usage: is_running <pidfile> <binary_name>
+is_running() {
+  local pidfile=$1 name=$2 pid
+  [[ -f "${pidfile}" ]] || return 1
+  pid=$(cat "${pidfile}")
+  kill -0 "${pid}" 2>/dev/null || { rm -f "${pidfile}"; return 1; }
+  # Verify the process is actually the expected binary, not a recycled PID.
+  local exe
+  exe=$(readlink -f "/proc/${pid}/exe" 2>/dev/null || true)
+  if [[ "${exe##*/}" != "${name}" ]]; then
+    rm -f "${pidfile}"
+    return 1
+  fi
+  return 0
+}
 
 /opt/workshop/bin/configure-hermes.sh
 
@@ -72,8 +100,7 @@ if [[ "${ENVOY_GEN_CONFIG}" != "${CONFIG_PATH}" ]]; then
   rm -f "${ENVOY_GEN_CONFIG}"
 fi
 
-if [[ -f "${STATE_DIR}/router.pid" ]] \
-  && kill -0 "$(cat "${STATE_DIR}/router.pid")" 2>/dev/null; then
+if is_running "${STATE_DIR}/router.pid" "router"; then
   echo "✓ Router already running"
 else
   nohup /usr/local/bin/router \
@@ -85,8 +112,7 @@ else
 fi
 wait_http "Router management" "${ROUTER_MANAGEMENT_API}/health"
 
-if [[ -f "${STATE_DIR}/envoy.pid" ]] \
-  && kill -0 "$(cat "${STATE_DIR}/envoy.pid")" 2>/dev/null; then
+if is_running "${STATE_DIR}/envoy.pid" "envoy"; then
   echo "✓ Envoy already running"
 else
   nohup /usr/local/bin/envoy \
@@ -195,8 +221,7 @@ print("  patch-3 shim -> index.html")
 PATCH_ALL
 fi
 
-if [[ -f "${STATE_DIR}/dashboard.pid" ]] \
-  && kill -0 "$(cat "${STATE_DIR}/dashboard.pid")" 2>/dev/null; then
+if is_running "${STATE_DIR}/dashboard.pid" "dashboard-backend"; then
   echo "✓ Dashboard already running"
 else
   ROUTER_CONFIG_PATH="${CONFIG_PATH}" \
