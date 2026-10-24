@@ -1,0 +1,67 @@
+{
+  "pr": {
+    "repo": "https://github.com/k1LoW/gh-copilot-review",
+    "pr_number": 9,
+    "base": "5f3765a9ef25d9c5a57699418bed105d9ac54691",
+    "head": "f98281938e63acd1d2df9b89d6af98dcf58c9fa8"
+  },
+  "agent": "openclaw-vllm-sr-panel",
+  "findings": [
+    {
+      "file": "cmd/root.go",
+      "start_line": 47,
+      "end_line": 80,
+      "message": "MinimizeCopilotComments (line 47) unconditionally minimizes Copilot review comments with OUTDATED classifier before the freshness check at line 73. If IsCopilotReviewFresh returns true, the function exits at line 79 printing 'already up to date', but the user's valid Copilot comments have already been hidden as outdated. Move the freshness check above the minimization call, or skip minimization when the review is fresh.",
+      "producer": "openclaw-vllm-sr-panel"
+    },
+    {
+      "file": "cmd/root.go",
+      "start_line": 64,
+      "end_line": 80,
+      "message": "PR body says CheckCopilotReviewStatus() fetches head SHA and reviews 'in a single pass' and uses gh api --paginate --jq with json.Decoder. No such method, single-pass fetch, or --paginate path exists. Three sequential REST calls (requested_reviewers, reviews, reviews) replace the described single call; update the description or the code.",
+      "producer": "openclaw-vllm-sr-panel"
+    },
+    {
+      "file": "internal/github/github.go",
+      "start_line": 56,
+      "end_line": 117,
+      "message": "HasCopilotPendingReview (line 63) and IsCopilotReviewFresh (line 100) both GET /pulls/{n}/reviews. root.go calls them sequentially (lines 64, 73), doubling the reviews API request. The PR body claims these are consolidated into one call; the implementation does not do this, wasting rate-limit budget on every run.",
+      "producer": "openclaw-vllm-sr-panel"
+    },
+    {
+      "file": "internal/github/github.go",
+      "start_line": 75,
+      "end_line": 117,
+      "message": "IsCopilotReviewFresh has no automated test despite gating the primary user action. Edge cases (0 commits, 0 reviews, all-zero timestamps, Copilot login variants) are untested and silently return false.",
+      "producer": "openclaw-vllm-sr-panel"
+    },
+    {
+      "file": "internal/github/github.go",
+      "start_line": 84,
+      "end_line": 91,
+      "message": "c.rest.Get does not auto-paginate. For PRs with more than 30 commits, commits[len(commits)-1] is the 30th commit, not the latest. The freshness comparison at line 116 then checks against a stale date, producing false positives that skip needed review requests. The PR description claims gh api --paginate handling, but no pagination logic exists in the implementation.",
+      "producer": "openclaw-vllm-sr-panel"
+    },
+    {
+      "file": "internal/github/github.go",
+      "start_line": 91,
+      "end_line": 116,
+      "message": "Freshness compares submitted_at timestamps rather than commit_id vs head SHA as the PR description states. A Copilot review submitted after the last push can still cover a prior commit (review in progress when new commits land). Compare the review's commit_id against the PR head SHA to correctly determine if the review covers the latest code.",
+      "producer": "openclaw-vllm-sr-panel"
+    },
+    {
+      "file": "internal/github/github.go",
+      "start_line": 100,
+      "end_line": 100,
+      "message": "c.rest.Get() does not paginate /pulls/{n}/reviews either. Copilot reviews beyond page 1 (30 items) are invisible, so latestCopilotReview may be zero or stale, causing false negatives. Same missing-pagination root cause as the commits call.",
+      "producer": "openclaw-vllm-sr-panel"
+    },
+    {
+      "file": "internal/github/github.go",
+      "start_line": 116,
+      "end_line": 116,
+      "message": "Strict After() means a review submitted in the same second as the head commit (both at :00.000Z) is treated as stale, triggering an unnecessary re-review. Consider !Before() or comparing against head SHA instead.",
+      "producer": "openclaw-vllm-sr-panel"
+    }
+  ]
+}

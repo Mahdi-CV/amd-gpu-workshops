@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="330" viewBox="0 0 900 330">
+<style>text{font-family:Arial,sans-serif;fill:#222}.title{font-size:26px;font-weight:700}.label{font-size:20px}.value{font-size:18px;font-weight:700}</style>
+<rect width="100%" height="100%" fill="white"/>
+<text x="450" y="38" text-anchor="middle" class="title">OpenClaw review workflow: relative GPU-cost units</text>
+<text x="254" y="123" text-anchor="end" class="label">All-GLM token-equivalent</text>
+<rect x="270" y="92" width="540.0" height="48" rx="7" fill="#ED1C24"/>
+<text x="822.0" y="123" class="value">0.04651 XXX</text>
+<text x="254" y="228" text-anchor="end" class="label">vllm-sr/auto measured</text>
+<rect x="270" y="197" width="248.1" height="48" rx="7" fill="#0072CE"/>
+<text x="530.1" y="228" class="value">0.02136 XXX</text>
+</svg>

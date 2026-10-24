@@ -1,0 +1,71 @@
+{
+  "live_task": "k1LoW_gh-copilot-review_9-f9828193",
+  "tasks": [
+    {
+      "key": "k1LoW_gh-copilot-review_9-f9828193",
+      "reviewbench_index": 9,
+      "repo": "https://github.com/review-bench/k1LoW_gh-copilot-review.git",
+      "nwo": "k1LoW/gh-copilot-review",
+      "pr_number": 9,
+      "base": "5f3765a9ef25d9c5a57699418bed105d9ac54691",
+      "head": "f98281938e63acd1d2df9b89d6af98dcf58c9fa8",
+      "language": "Go",
+      "role": "live-demo"
+    },
+    {
+      "key": "PierreJanineh_TechDebtMCP_135-16a54f0f",
+      "reviewbench_index": 0,
+      "repo": "https://github.com/review-bench/PierreJanineh_TechDebtMCP.git",
+      "nwo": "PierreJanineh/TechDebtMCP",
+      "pr_number": 135,
+      "base": "ea0385c7349bbaee04456c57bf0ec3f217d63532",
+      "head": "16a54f0f85a9091f220418850eac6b4122782be5",
+      "language": "TypeScript",
+      "role": "evaluation"
+    },
+    {
+      "key": "AA-Factory_aafactory-prototype_17-a1978cb7",
+      "reviewbench_index": 4,
+      "repo": "https://github.com/review-bench/AA-Factory_aafactory-prototype.git",
+      "nwo": "AA-Factory/aafactory-prototype",
+      "pr_number": 17,
+      "base": "e7f558c7360abac335af2df22f4ed376992b30ab",
+      "head": "a1978cb75950a879df8805e4a5f373eb6678f6f9",
+      "language": "Python",
+      "role": "evaluation"
+    },
+    {
+      "key": "brexhq_CrabTrap_15-5ef0884c",
+      "reviewbench_index": 8,
+      "repo": "https://github.com/review-bench/brexhq_CrabTrap.git",
+      "nwo": "brexhq/CrabTrap",
+      "pr_number": 15,
+      "base": "b29930e93765700608313c0f0d32c4818734e158",
+      "head": "5ef0884c59b3ee1d5a986dd02686a8232570c80f",
+      "language": "Go",
+      "role": "evaluation"
+    },
+    {
+      "key": "allan-mobley-jr_gimmes_468-e1477f8b",
+      "reviewbench_index": 18,
+      "repo": "https://github.com/review-bench/allan-mobley-jr_gimmes.git",
+      "nwo": "allan-mobley-jr/gimmes",
+      "pr_number": 468,
+      "base": "08efd0bbc34fd29de2a4077f07d24f3dc02a63b6",
+      "head": "e1477f8b3f18c1de6ff87dbca9465a7b106dc193",
+      "language": "Python",
+      "role": "evaluation"
+    },
+    {
+      "key": "Marvell-Consulting_statswales-frontend_626-30ba27a5",
+      "reviewbench_index": 24,
+      "repo": "https://github.com/review-bench/Marvell-Consulting_statswales-frontend.git",
+      "nwo": "Marvell-Consulting/statswales-frontend",
+      "pr_number": 626,
+      "base": "c1707c79a5a947cf7c6912af3ad00848c42a28e0",
+      "head": "30ba27a5f20318f12fe74f26059d8b62d62874e9",
+      "language": "TypeScript",
+      "role": "evaluation"
+    }
+  ]
+}
