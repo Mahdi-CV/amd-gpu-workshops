@@ -820,6 +820,15 @@ pytest suite, and report the result.
                     if all_glm and not missing
                     else None
                 ),
+                "all_glm_baseline_index": (
+                    100.0 if all_glm and not missing else None
+                ),
+                "vllm_sr_auto_index": (
+                    round(routed / all_glm * 100, 2)
+                    if all_glm and not missing
+                    else None
+                ),
+                "compute_avoided_index": reduction,
                 "incomplete_cost_calls": missing,
                 "baseline": (
                     "The same observed prompt and completion tokens priced "
@@ -850,7 +859,7 @@ pytest suite, and report the result.
             f"{'Selected model':<28}"
             f"{'Calls':>8}"
             f"{'Share':>10}"
-            f"{'Reasoning effort':>24}"
+            f"{'Detected effort':>24}"
         )
         print("-" * 78)
         for row in summary["models"]:
@@ -867,24 +876,20 @@ pytest suite, and report the result.
 
         compute = summary["relative_compute"]
         print()
-        print("Relative compute (XXX; lower is better)")
+        print("Relative compute index (all-GLM baseline = 100)")
         print("-" * 78)
-        print(
-            f"{'vLLM-SR auto':<48}"
-            f"{compute['vllm_sr_auto_xxx']:>18.8f} XXX"
-        )
-        print(
-            f"{'All GLM-5.3-Flash @ max (same tokens)':<48}"
-            f"{compute['all_glm_flash_max_same_tokens_xxx']:>18.8f} XXX"
-        )
         if compute["reduction_percent"] is not None:
             print(
-                f"{'Relative compute avoided':<48}"
-                f"{compute['reduction_percent']:>17.2f}%"
+                f"{'All GLM-5.3-Flash @ max':<48}"
+                f"{compute['all_glm_baseline_index']:>18.1f}"
             )
             print(
-                f"{'Auto used this share of the GLM baseline':<48}"
-                f"{compute['routed_share_of_glm_baseline_percent']:>17.2f}%"
+                f"{'vLLM-SR auto':<48}"
+                f"{compute['vllm_sr_auto_index']:>18.1f}"
+            )
+            print(
+                f"{'Compute avoided':<48}"
+                f"{compute['compute_avoided_index']:>17.1f}%"
             )
         else:
             print(
@@ -893,10 +898,13 @@ pytest suite, and report the result.
             )
         print()
         print(
+            "* Read this as: for every 100 compute units used by the all-GLM "
+            "baseline, vLLM-SR used the smaller number shown above."
+        )
+        print(
             "* Conservative same-token comparison: it does not assume the "
             "additional reasoning tokens an all-GLM/max run may generate."
         )
-        print("* XXX is relative compute, not dollars.")
         return summary
 
     def cost_summary(self, *, source: str = "live") -> dict[str, Any]:

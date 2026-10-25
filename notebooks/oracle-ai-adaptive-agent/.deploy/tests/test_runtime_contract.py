@@ -172,3 +172,6 @@ def test_routing_summary_aggregates_models_and_glm_baseline(tmp_path):
         == 0.001182
     )
     assert summary["relative_compute"]["reduction_percent"] == 60.32
+    assert summary["relative_compute"]["all_glm_baseline_index"] == 100.0
+    assert summary["relative_compute"]["vllm_sr_auto_index"] == 39.68
+    assert summary["relative_compute"]["compute_avoided_index"] == 60.32

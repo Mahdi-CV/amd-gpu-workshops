@@ -71,5 +71,7 @@ def test_multi_agent_notebook_uses_aggregate_route_reveal():
     _, text = notebook_text(NOTEBOOK)
     assert "Total routed LLM calls" in text
     assert "all-GLM-5.3-Flash" in text
+    assert "baseline of 100 compute units" in text
+    assert "`XXX` is relative compute" not in text
     assert "panel_routes = lab.route_report" not in text
     assert "live_routes = lab.route_report" not in text
