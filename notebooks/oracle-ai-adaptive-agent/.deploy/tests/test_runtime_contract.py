@@ -64,6 +64,16 @@ def test_tree_hashes_ignore_caches(tmp_path):
     }
 
 
+def test_stop_gateway_discards_stale_pid_file(tmp_path):
+    lab = WorkshopLab()
+    lab.gateway_pid = tmp_path / "gateway.pid"
+    lab.gateway_pid.write_text("999999999", encoding="utf-8")
+
+    lab.stop_gateway()
+
+    assert not lab.gateway_pid.exists()
+
+
 def test_expected_patch_constants():
     assert "//" in OLD_ACCURACY_LINE
     assert "total_typed + 1" in OLD_ACCURACY_LINE

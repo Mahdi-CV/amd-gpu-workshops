@@ -450,7 +450,11 @@ pytest suite, and report the result.
             self.gateway_pid.unlink(missing_ok=True)
             return
         if not self._pid_matches(pid, "openclaw"):
-            raise RuntimeError("Gateway PID file does not identify OpenClaw.")
+            # Container restarts can leave a PID file whose process exited or
+            # whose numeric PID was reused. Never signal that unrelated
+            # process; discard only the stale workshop PID file.
+            self.gateway_pid.unlink(missing_ok=True)
+            return
         try:
             os.kill(pid, signal.SIGTERM)
         except ProcessLookupError:
