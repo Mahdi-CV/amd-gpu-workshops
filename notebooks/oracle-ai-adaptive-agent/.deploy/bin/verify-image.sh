@@ -11,6 +11,7 @@ jupyter --version
 test ! -e /dev/kfd
 test ! -e /dev/dri/renderD128
 test -f "$WORKSHOP_ROOT/workshop.ipynb"
+test -f "$WORKSHOP_ROOT/openclaw-multi-agent-workshop.ipynb"
 test -f "$WORKSHOP_ROOT/.deploy/fixture/MANIFEST.sha256"
 
 (

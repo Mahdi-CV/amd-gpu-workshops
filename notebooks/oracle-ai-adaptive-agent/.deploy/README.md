@@ -97,6 +97,13 @@ ssh -L 8890:127.0.0.1:8890 root@165.245.141.106
 Open `http://127.0.0.1:8890/lab` and enter the token stored in
 `/etc/openclaw-vsr-workshop/jupyter_token`.
 
+Participant notebooks:
+
+```text
+openclaw-multi-agent-workshop.ipynb   original panel/Fixer workshop
+workshop.ipynb                        controlled routing evaluation
+```
+
 ## Operations
 
 Run packaged commands through Compose:

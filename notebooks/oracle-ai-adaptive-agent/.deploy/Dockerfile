@@ -68,7 +68,7 @@ RUN groupadd --gid "${WORKSHOP_GID}" workshop \
       workshop
 
 WORKDIR /opt/workshop
-COPY workshop.ipynb README.md /opt/workshop/
+COPY workshop.ipynb openclaw-multi-agent-workshop.ipynb README.md /opt/workshop/
 COPY .deploy/bin/ /opt/workshop/.deploy/bin/
 COPY .deploy/lib/ /opt/workshop/.deploy/lib/
 COPY .deploy/tests/ /opt/workshop/.deploy/tests/

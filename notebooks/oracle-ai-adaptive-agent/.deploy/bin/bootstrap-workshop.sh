@@ -14,10 +14,12 @@ mkdir -p \
   "$(dirname "$OPENCLAW_STATE_DIR")" \
   "$OPENCLAW_WORKSHOP_WORKSPACES"
 
-if [[ ! -f "$WORKSHOP_WORKSPACE/notebooks/workshop.ipynb" ]]; then
-  cp "$WORKSHOP_ROOT/workshop.ipynb" \
-    "$WORKSHOP_WORKSPACE/notebooks/workshop.ipynb"
-fi
+for notebook in workshop.ipynb openclaw-multi-agent-workshop.ipynb; do
+  if [[ ! -f "$WORKSHOP_WORKSPACE/notebooks/$notebook" ]]; then
+    cp "$WORKSHOP_ROOT/$notebook" \
+      "$WORKSHOP_WORKSPACE/notebooks/$notebook"
+  fi
+done
 if [[ ! -f "$WORKSHOP_WORKSPACE/notebooks/README.md" ]]; then
   cp "$WORKSHOP_ROOT/README.md" \
     "$WORKSHOP_WORKSPACE/notebooks/README.md"

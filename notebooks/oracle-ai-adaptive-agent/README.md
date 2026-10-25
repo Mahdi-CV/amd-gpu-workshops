@@ -6,7 +6,16 @@ This participant workshop teaches:
 2. how `vllm-sr/auto` selects model capability per role.
 
 The Docker runtime already contains OpenClaw, the fixture, endpoint proxy,
-state paths, and lifecycle commands. Open:
+state paths, and lifecycle commands.
+
+For the original performance/readability/Fixer workshop with the minimally
+updated MI300X + vLLM setup, open:
+
+```text
+openclaw-multi-agent-workshop.ipynb
+```
+
+The controlled debugging-team evaluation remains available as:
 
 ```text
 workshop.ipynb
