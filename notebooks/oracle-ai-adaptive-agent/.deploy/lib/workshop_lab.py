@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 import os
@@ -20,6 +21,18 @@ OLD_ACCURACY_LINE = (
     "    return round((correct // (total_typed + 1)) * 100, 1)"
 )
 NEW_ACCURACY_LINE = "    return round((correct / total_typed) * 100, 1)"
+
+
+def same_program(left: str, right: str) -> bool:
+    """True when both sources parse to the same AST.
+
+    Formatting and redundant parentheses do not change the AST, so
+    ``round(correct / total_typed * 100, 1)`` matches the expected fix.
+    """
+    try:
+        return ast.dump(ast.parse(left)) == ast.dump(ast.parse(right))
+    except SyntaxError:
+        return False
 
 
 class WorkshopLab:
@@ -512,10 +525,15 @@ pytest suite, and report the result.
             if fixture_hashes.get(key) != demo_hashes.get(key)
         )
         stats_text = (self.demo_repo / "stats.py").read_text(encoding="utf-8")
-        exact_patch = (
-            OLD_ACCURACY_LINE not in stats_text
-            and NEW_ACCURACY_LINE in stats_text
-            and changed == ["stats.py"]
+        expected_stats = (self.fixture / "stats.py").read_text(
+            encoding="utf-8"
+        ).replace(OLD_ACCURACY_LINE, NEW_ACCURACY_LINE, 1)
+        exact_patch = changed == ["stats.py"] and (
+            (
+                OLD_ACCURACY_LINE not in stats_text
+                and NEW_ACCURACY_LINE in stats_text
+            )
+            or same_program(stats_text, expected_stats)
         )
         value = {
             "pytest_returncode": tests.returncode,

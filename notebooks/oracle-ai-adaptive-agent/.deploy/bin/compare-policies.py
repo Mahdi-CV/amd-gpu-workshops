@@ -14,6 +14,7 @@ The harness is intentionally self-contained and secret-safe:
 from __future__ import annotations
 
 import argparse
+import ast
 import csv
 import difflib
 import hashlib
@@ -992,6 +993,18 @@ def tree_sha256(files: dict[str, bytes], prefix: str = "") -> str:
     return digest.hexdigest()
 
 
+def same_program(left: str, right: str) -> bool:
+    """True when both sources parse to the same AST.
+
+    Formatting and redundant parentheses do not change the AST, so
+    ``round(correct / total_typed * 100, 1)`` matches the expected fix.
+    """
+    try:
+        return ast.dump(ast.parse(left)) == ast.dump(ast.parse(right))
+    except SyntaxError:
+        return False
+
+
 def source_integrity(
     pristine: dict[str, bytes],
     current: dict[str, bytes],
@@ -1012,7 +1025,10 @@ def source_integrity(
     )
     exact_patch = (
         stats_before.count(OLD_ACCURACY_LINE) == 1
-        and stats_after == expected_stats
+        and (
+            stats_after == expected_stats
+            or same_program(stats_after, expected_stats)
+        )
         and changed == ["stats.py"]
     )
     patch = "".join(

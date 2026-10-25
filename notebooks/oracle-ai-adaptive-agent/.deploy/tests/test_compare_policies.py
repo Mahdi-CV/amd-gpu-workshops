@@ -119,6 +119,27 @@ def test_source_integrity_requires_only_exact_stats_fix(tmp_path):
     assert not compare.source_integrity(before, after)["tests_unchanged"]
 
 
+def test_source_integrity_accepts_equivalent_parentheses():
+    before = {
+        "stats.py": (
+            "def f():\n"
+            f"{compare.OLD_ACCURACY_LINE}\n"
+        ).encode(),
+    }
+    after = {
+        "stats.py": (
+            "def f():\n"
+            "    return round(correct / total_typed * 100, 1)\n"
+        ).encode(),
+    }
+    assert compare.source_integrity(before, after)["exact_source_patch"]
+    after["stats.py"] = (
+        "def f():\n"
+        "    return round(correct / (total_typed * 100), 1)\n"
+    ).encode()
+    assert not compare.source_integrity(before, after)["exact_source_patch"]
+
+
 def test_get_models_uses_bearer_credential_without_returning_it(tmp_path):
     seen = {}
 
