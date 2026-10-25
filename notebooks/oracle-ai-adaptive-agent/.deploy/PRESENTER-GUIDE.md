@@ -1,94 +1,45 @@
-# Presenter Guide: Build the Review Team, Route the Work
+# Presenter Guide: Build an OpenClaw Debugging Team
 
-## Split-screen layout
+## The two workshop goals
 
-Left:
+1. Build and operate a visible OpenClaw multi-agent team.
+2. Show that one `vllm-sr/auto` endpoint assigns different models to different
+   roles while preserving a deterministic quality result.
+
+Do not turn this into a routing benchmark lecture. OpenClaw is the application;
+vLLM Semantic Router is the inference policy underneath it.
+
+## Recommended layout
 
 ```text
-workshop.ipynb
+left:   workshop.ipynb
+right:  openclaw tui
+side:   vLLM-SR Dashboard → Insights
 ```
-
-Right:
-
-```text
-vLLM-SR Dashboard → Insights
-```
-
-Keep the Dashboard filtered to the newest records.
 
 ## 30-minute run of show
 
 | Segment | Minutes |
 | --- | ---: |
-| Two workshop goals | 2 |
-| Public PR and OpenClaw team | 4 |
-| `decision-balance` route map | 4 |
-| Precomputed all-GLM card | 3 |
-| Live routed panel | 10 |
-| Dashboard route reveal | 4 |
-| Cost comparison and close | 3 |
+| Two goals and recipe route map | 3 |
+| Meet `main` and inspect workspace files | 5 |
+| See the failing application tests | 4 |
+| Add the three specialist agents | 7 |
+| Run four interactive TUI turns | 7 |
+| Reveal routes, cost, and passing tests | 4 |
 
-## Opening
+## Before presenting
 
-Say:
+Use a fresh workshop state:
 
-> We will keep the OpenClaw team fixed. First I will show what it costs when
-> every inference call uses the strongest model. Then we will run the same
-> work through one virtual model and watch vLLM Semantic Router allocate model
-> and reasoning effort per phase.
-
-## Show the team
-
-```text
-repository triage
-        |
-        +--> correctness/security
-        +--> reliability/performance
-        +--> integration/control-flow
-        |
-exact API fact check
-        |
-final report
+```bash
+rm -rf /tmp/openclaw-vsr-simple-state
+rm -rf /tmp/openclaw-vsr-simple-agents
+rm -rf /tmp/openclaw-vsr-simple-demo
+rm -rf notebooks/oracle-ai-adaptive-agent/.deploy/live
 ```
 
-Explain:
-
-- Triage has repository tools.
-- Reviewers receive a frozen inline packet and are tool-free.
-- Findings are deduplicated deterministically.
-- The reporter produces a short author-facing summary.
-
-## Show the baseline card
-
-The desired final baseline is an actual precomputed run through:
-
-```text
-vllm-sr/all-glm
-```
-
-Until that is available, the notebook displays:
-
-```text
-token-equivalent all-GLM estimate: 0.04651 XXX
-```
-
-Say **estimate**, not measurement.
-
-## Audience prediction
-
-Ask the audience which phases need GLM:
-
-| Phase | Prediction |
-| --- | --- |
-| Coordinator plan | ? |
-| Repository triage | ? |
-| Code review | ? |
-| Exact API facts | ? |
-| Final report | ? |
-
-## Run live
-
-Before opening Jupyter, configure:
+Set:
 
 ```bash
 export OPENAI_BASE_URL="https://your-endpoint.example/v1"
@@ -97,63 +48,104 @@ export OPENAI_MODEL="vllm-sr/auto"
 export VLLM_SR_DASHBOARD_URL="https://your-dashboard.example"
 ```
 
-Then run the endpoint configuration, proxy, setup, and panel cells in order.
-
-While the panel runs, keep Dashboard Insights visible.
-
-Point out each new record:
-
-1. Requested model remains `vllm-sr/auto`.
-2. Decision changes per phase.
-3. Physical model changes.
-4. Reasoning effort changes.
-5. Relative cost accumulates.
-
-Expected route reveal:
+Verify the exact four prompts against the current endpoint before the room
+opens. Expected routes for Decision Balance `0.3.2`:
 
 ```text
-Coordinator plan   fast      27B          off
-Repository triage  agentic   GLM          high
-Code reviewers     code      Flash-Next   medium
-API fact check     facts     GLM          low
-Final report       fast      27B          off
+bug_reviewer   code      Qwen3.8-Flash-Next   medium
+test_reviewer  code      Qwen3.8-Flash-Next   medium
+fixer          agentic   GLM-5.3-Flash         high
+main           fast      Qwen3.8-27B           off
 ```
 
-## Findings to highlight
+Fixer continuations may appear as `recovery`; they still remain on GLM.
 
-The routed panel found:
+## Teaching OpenClaw
 
-- missing pagination for PR commits;
-- missing pagination for reviews;
-- duplicate review API calls;
-- timestamp freshness instead of `commit_id` versus head SHA;
-- missing automated coverage;
-- PR-description/implementation mismatch;
-- current comments minimized before the freshness early return.
+Slow down for:
 
-The last item is the high-severity cross-function ordering issue.
+- `openclaw agents add`;
+- separate workspace directories;
+- `AGENTS.md` role instructions;
+- `/agent <id>` in the TUI; and
+- the difference between no-tools reviewers and the tool-capable Fixer.
 
-## Cost reveal
+The human is deliberately the orchestrator in the main exercise. This keeps
+every handoff visible and reliable.
 
-Show:
+Automatic `sessions_spawn` orchestration is the optional follow-up challenge.
+
+## Teaching vLLM-SR
+
+Explain why the route split is intentional:
+
+- reviewers already have the small artifact, so tool schemas add no value;
+- the Fixer must read, edit, and execute, so GLM handles agentic work;
+- the final report is explicitly one sentence, so the fast lane is enough.
+
+The application never names any physical model.
+
+## Quality claim
+
+Use only:
 
 ```text
-vllm-sr/auto measured:       0.02136 XXX
-all-GLM token-equivalent:    0.04651 XXX
-estimated reduction:         54.1%
+Before: 5 failed, 102 passed
+After:  107 passed
 ```
 
-Closing line:
+This is a deterministic pytest result. Do not describe it as an LLM-judge
+score.
 
-> We did not remove agents, review stages, or capability. We changed only the
-> inference policy underneath OpenClaw.
+## Cost claim
+
+The notebook reports:
+
+- measured routed relative cost from endpoint headers; and
+- a same-token all-GLM estimate.
+
+Verified rehearsal:
+
+```text
+Routed measured:             0.03340875 XXX
+All-GLM same-token estimate: 0.04042020 XXX
+Estimated reduction:        17.35%
+Quality gate:               107 passed
+```
+
+Say:
+
+> The routed value is measured. The all-GLM value applies GLM's relative factor
+> to the exact same token counts. `XXX` is a relative compute unit, not dollars.
+
+## Reliability evidence
+
+The October 24–25, 2026 controlled study produced:
+
+- 81 naturally completed bug-fix runs;
+- 81 successful fixes;
+- 41/41 explicit-prompt successes; and
+- 40/40 naturally completed original-notebook-prompt successes.
+
+One additional run was deliberately terminated while packaging the remote
+experiment and is not a model failure.
+
+The study also showed why the workshop needed this redesign: a monolithic
+tool-using bug fixer sent every call to GLM. Focused no-tools roles are what
+create a meaningful Mixture-of-Models demonstration.
 
 ## Fallback
 
-If live inference fails:
+If a live route differs:
 
-1. Open `.deploy/artifacts/workshop.executed.ipynb`.
-2. Show `reviewbench-demo-summary.json`.
-3. Show `reviewbench-cost.svg`.
-4. Open the saved findings JSON.
-5. Continue with the Dashboard screenshots or recorded route sequence.
+1. show the actual Dashboard decision;
+2. explain which signal changed;
+3. keep the deterministic pytest quality gate; and
+4. use the saved rehearsal route table for the intended three-model split.
+
+Do not hide a real routing result.
+
+## Closing line
+
+> We kept the capable OpenClaw team and the passing-test requirement. We let
+> the router spend expensive inference only where the role needed it.

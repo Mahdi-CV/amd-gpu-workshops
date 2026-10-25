@@ -4,6 +4,12 @@ notebooks/austin_ws/opennutrition_foods.tsv
 venv/
 .venv/
 env/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Workshop runtime artifacts
+notebooks/oracle-ai-adaptive-agent/.deploy/live/
 
 # Archives
 *.zip
