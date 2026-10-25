@@ -104,6 +104,10 @@ RUN find /opt/workshop -type d -name __pycache__ -prune -exec rm -rf {} + \
     && if [[ -f /opt/workshop/.deploy/bin/compare-policies.py ]]; then \
          ln -s /opt/workshop/.deploy/bin/compare-policies.py \
            /usr/local/bin/workshop-compare; \
+       fi \
+    && if [[ -f /opt/workshop/.deploy/bin/analyze-policy-results.py ]]; then \
+         ln -s /opt/workshop/.deploy/bin/analyze-policy-results.py \
+           /usr/local/bin/workshop-analyze-results; \
        fi
 
 ENV PATH="/opt/workshop-venv/bin:/usr/local/bin:${PATH}" \

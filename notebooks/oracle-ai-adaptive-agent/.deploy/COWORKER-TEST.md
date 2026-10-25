@@ -66,7 +66,7 @@ Hard gates:
 Baseline: 5 failed, 102 passed
 Final:    107 passed
 Tests unchanged: true
-Exact source-only patch: true
+Minimal source-only fix: true
 ```
 
 Before every TUI prompt, run its `lab.mark_phase(...)` cell.
@@ -109,7 +109,21 @@ docker compose \
     /workspace/results/coworker-comparison/summary.json
 ```
 
-Both policies must complete all three runs with `107 passed`.
+Generate the sanitized detailed analysis:
+
+```bash
+docker compose \
+  --env-file /etc/openclaw-vsr-workshop/workshop.env \
+  exec workshop \
+  workshop-analyze-results \
+    /workspace/results/coworker-comparison/summary.json \
+    --json-output /workspace/results/coworker-comparison/analysis.json \
+    --markdown-output /workspace/results/coworker-comparison/analysis.md
+```
+
+Treat a run as functionally successful when it reaches `107 passed`, leaves
+tests unchanged, and makes only the accepted one-line source fix. Do not reject
+the equivalent unparenthesized form of the same expression.
 
 ## 5. Return these artifacts
 
@@ -124,6 +138,8 @@ Return:
 - `summary.json`
 - `comparison.csv`
 - `report.md`
+- `analysis.json`
+- `analysis.md`
 - each arm's `routes.jsonl`
 - pytest before/after outputs
 - patch diffs

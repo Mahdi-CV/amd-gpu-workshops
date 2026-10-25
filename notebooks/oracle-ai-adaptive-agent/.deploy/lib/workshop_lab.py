@@ -20,6 +20,13 @@ OLD_ACCURACY_LINE = (
     "    return round((correct // (total_typed + 1)) * 100, 1)"
 )
 NEW_ACCURACY_LINE = "    return round((correct / total_typed) * 100, 1)"
+EQUIVALENT_ACCURACY_LINE = (
+    "    return round(correct / total_typed * 100, 1)"
+)
+ACCEPTED_ACCURACY_LINES = (
+    NEW_ACCURACY_LINE,
+    EQUIVALENT_ACCURACY_LINE,
+)
 
 
 class WorkshopLab:
@@ -53,6 +60,9 @@ class WorkshopLab:
         self.verification_file = self.runtime / "verification.json"
         self.rehearsal_file = (
             self.root / ".deploy/artifacts/simple-route-results.json"
+        )
+        self.policy_analysis_file = (
+            self.root / ".deploy/artifacts/policy-analysis.json"
         )
         self.openclaw = shutil.which("openclaw") or "openclaw"
         self.auto_model = os.getenv("AUTO_MODEL", "vllm-sr/auto")
@@ -512,10 +522,25 @@ pytest suite, and report the result.
             if fixture_hashes.get(key) != demo_hashes.get(key)
         )
         stats_text = (self.demo_repo / "stats.py").read_text(encoding="utf-8")
-        exact_patch = (
-            OLD_ACCURACY_LINE not in stats_text
-            and NEW_ACCURACY_LINE in stats_text
+        fixture_stats = (self.fixture / "stats.py").read_text(
+            encoding="utf-8"
+        )
+        replacement = next(
+            (
+                line
+                for line in ACCEPTED_ACCURACY_LINES
+                if stats_text
+                == fixture_stats.replace(OLD_ACCURACY_LINE, line, 1)
+            ),
+            None,
+        )
+        source_fix_valid = (
+            fixture_stats.count(OLD_ACCURACY_LINE) == 1
+            and replacement is not None
             and changed == ["stats.py"]
+        )
+        exact_patch = (
+            source_fix_valid and replacement == NEW_ACCURACY_LINE
         )
         value = {
             "pytest_returncode": tests.returncode,
@@ -530,6 +555,14 @@ pytest suite, and report the result.
             "contains_107_passed": "107 passed" in tests.stdout,
             "tests_unchanged": tests_unchanged,
             "changed_files": changed,
+            "source_fix_valid": source_fix_valid,
+            "source_fix_variant": (
+                "canonical"
+                if replacement == NEW_ACCURACY_LINE
+                else "equivalent"
+                if replacement == EQUIVALENT_ACCURACY_LINE
+                else None
+            ),
             "exact_source_patch": exact_patch,
         }
         value["passed"] = all(
@@ -537,7 +570,7 @@ pytest suite, and report the result.
                 value["pytest_returncode"] == 0,
                 value["contains_107_passed"],
                 value["tests_unchanged"],
-                value["exact_source_patch"],
+                value["source_fix_valid"],
             )
         )
         self.verification_file.write_text(
@@ -631,6 +664,65 @@ pytest suite, and report the result.
             ),
             "incomplete_cost_calls": missing,
         }
+        return result
+
+    def policy_comparison(self) -> dict[str, Any]:
+        if not self.policy_analysis_file.is_file():
+            raise FileNotFoundError(
+                "The precomputed policy-analysis artifact is not installed."
+            )
+        body = json.loads(
+            self.policy_analysis_file.read_text(encoding="utf-8")
+        )
+        auto = body["arms"]["auto"]
+        direct = body["arms"]["direct_glm"]
+        matched = body["matched_successful_pairs"]
+        routing = body["same_auto_token_backend_mix"]
+        result = {
+            "quality_gate": body["quality_definition"],
+            "reliability": {
+                "vllm_sr_auto": (
+                    f"{auto['functional_successes']}/{auto['attempts']}"
+                ),
+                "direct_glm": (
+                    f"{direct['functional_successes']}/{direct['attempts']}"
+                ),
+            },
+            "empirical_matched_successes": {
+                "pairs": matched["count"],
+                "auto_cost_xxx": matched["auto_cost_xxx"],
+                "direct_glm_cost_xxx": matched[
+                    "direct_glm_cost_xxx"
+                ],
+                "auto_savings_percent": matched[
+                    "pooled_auto_savings_percent"
+                ],
+                "latency_reduction_percent": matched[
+                    "pooled_latency_reduction_percent"
+                ],
+            },
+            "same_auto_token_sensitivity": {
+                "auto_actual_cost_xxx": routing[
+                    "auto_actual_cost_xxx"
+                ],
+                "same_tokens_at_glm_rates_xxx": routing[
+                    "same_tokens_at_glm_rates_xxx"
+                ],
+                "gross_backend_model_mix_savings_percent": routing[
+                    "gross_backend_model_mix_savings_percent"
+                ],
+            },
+            "auto_route_counts": {
+                "models": body["auto_routes"]["models"],
+                "decisions": body["auto_routes"]["decisions"],
+                "phase_routes": body["auto_routes"]["phase_routes"],
+            },
+            "qualification": {
+                "unit": "XXX is relative compute, not money.",
+                "same_token": routing["qualification"],
+            },
+        }
+        print(json.dumps(result, indent=2))
         return result
 
 

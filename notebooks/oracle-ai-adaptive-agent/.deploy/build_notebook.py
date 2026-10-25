@@ -197,7 +197,8 @@ Copy its complete answer.
 """
     ),
     code(
-        """BUG_REVIEW = ""
+        """BUG_REVIEW = '''
+'''
 """
     ),
     md(
@@ -230,7 +231,8 @@ Copy its complete answer.
 """
     ),
     code(
-        """TEST_REVIEW = ""
+        """TEST_REVIEW = '''
+'''
 """
     ),
     md(
@@ -268,7 +270,7 @@ The notebook checks the result independently. It requires:
 - exactly `107 passed`;
 - byte-identical tests;
 - only `stats.py` changed; and
-- the exact source correction.
+- a minimal accepted source correction.
 """
     ),
     code(
@@ -283,7 +285,8 @@ cannot claim success after a failed quality gate.
 """
     ),
     code(
-        """main_prompt = lab.build_main_prompt(verification)
+        """assert verification["passed"], "Stop: the quality gate did not pass."
+main_prompt = lab.build_main_prompt(verification)
 lab.mark_phase("main")
 print(main_prompt)
 """
@@ -336,7 +339,31 @@ Fixer continuations may route as `recovery`; they should remain on GLM.
     ),
     md(
         """---
-## Section 5 — Verified Rehearsal
+## Section 5 — Precomputed Auto vs Direct GLM
+
+The live run above proves the routing behavior. This precomputed matched
+comparison answers the second workshop question: what changed when the same
+OpenClaw team used `vllm-sr/auto` instead of sending every request directly to
+GLM?
+
+Every included matched workflow passed the same deterministic quality gate.
+The output separates:
+
+- empirical policy-level savings from actual auto and direct-GLM executions;
+- same-auto-token backend-mix savings, which is a counterfactual sensitivity;
+- reliability and route distribution.
+
+`XXX` is relative compute, not money.
+"""
+    ),
+    code(
+        """policy_comparison = lab.policy_comparison()
+policy_comparison
+"""
+    ),
+    md(
+        """---
+## Section 6 — Verified Rehearsal
 
 This section is explicitly separate from the live session. Use it only as a
 presentation fallback.

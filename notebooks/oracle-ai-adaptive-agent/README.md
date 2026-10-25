@@ -44,6 +44,22 @@ After:  107 passed
 The notebook also verifies that tests are unchanged and only the intended
 source line changed.
 
+## Verified policy evidence
+
+The bundled sanitized analysis combines nine matched attempts:
+
+```text
+vllm-sr/auto functional success: 9/9
+Direct GLM functional success:   8/9
+Successful matched pairs:        8
+Empirical compute reduction:     51.66%
+Same-token backend-mix estimate: 14.81%
+```
+
+`XXX` is a versioned relative-compute unit, not money. Open
+`.deploy/artifacts/policy-analysis.md` for the complete methodology, per-pair
+results, route distribution, and limitations.
+
 ## Runtime commands
 
 Inside the container:
@@ -54,6 +70,9 @@ workshop-reset
 workshop-verify-image
 workshop-verify-e2e
 workshop-compare --repetitions 3
+workshop-analyze-results SUMMARY.json \
+  --json-output analysis.json \
+  --markdown-output analysis.md
 ```
 
 Deployment and coworker instructions are under `.deploy/`.

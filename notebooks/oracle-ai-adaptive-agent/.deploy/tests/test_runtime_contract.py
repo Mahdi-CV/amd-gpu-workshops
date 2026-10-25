@@ -69,3 +69,21 @@ def test_expected_patch_constants():
     assert NEW_ACCURACY_LINE == (
         "    return round((correct / total_typed) * 100, 1)"
     )
+
+
+def test_policy_comparison_artifact_is_notebook_ready():
+    value = WorkshopLab().policy_comparison()
+    assert value["reliability"] == {
+        "vllm_sr_auto": "9/9",
+        "direct_glm": "8/9",
+    }
+    assert (
+        value["empirical_matched_successes"]["auto_savings_percent"]
+        == 51.66
+    )
+    assert (
+        value["same_auto_token_sensitivity"][
+            "gross_backend_model_mix_savings_percent"
+        ]
+        == 14.81
+    )

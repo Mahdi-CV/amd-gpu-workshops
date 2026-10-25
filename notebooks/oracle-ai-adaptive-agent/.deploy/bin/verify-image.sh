@@ -19,6 +19,8 @@ test -f "$WORKSHOP_ROOT/.deploy/fixture/MANIFEST.sha256"
 )
 
 python3 -m py_compile \
+  "$WORKSHOP_ROOT/.deploy/bin/analyze-policy-results.py" \
+  "$WORKSHOP_ROOT/.deploy/bin/compare-policies.py" \
   "$WORKSHOP_ROOT/.deploy/bin/logging_proxy.py" \
   "$WORKSHOP_ROOT/.deploy/bin/endpoint_access.py" \
   "$WORKSHOP_ROOT/.deploy/lib/workshop_lab.py"

@@ -61,6 +61,13 @@ OLD_ACCURACY_LINE = (
     "    return round((correct // (total_typed + 1)) * 100, 1)"
 )
 NEW_ACCURACY_LINE = "    return round((correct / total_typed) * 100, 1)"
+EQUIVALENT_ACCURACY_LINE = (
+    "    return round(correct / total_typed * 100, 1)"
+)
+ACCEPTED_ACCURACY_LINES = (
+    NEW_ACCURACY_LINE,
+    EQUIVALENT_ACCURACY_LINE,
+)
 
 
 def utc_now() -> str:
@@ -1005,16 +1012,21 @@ def source_integrity(
     tests_after = tree_sha256(current, "tests/")
     stats_before = pristine.get("stats.py", b"").decode("utf-8")
     stats_after = current.get("stats.py", b"").decode("utf-8")
-    expected_stats = stats_before.replace(
-        OLD_ACCURACY_LINE,
-        NEW_ACCURACY_LINE,
-        1,
+    replacement = next(
+        (
+            line
+            for line in ACCEPTED_ACCURACY_LINES
+            if stats_after
+            == stats_before.replace(OLD_ACCURACY_LINE, line, 1)
+        ),
+        None,
     )
-    exact_patch = (
+    source_fix_valid = (
         stats_before.count(OLD_ACCURACY_LINE) == 1
-        and stats_after == expected_stats
+        and replacement is not None
         and changed == ["stats.py"]
     )
+    exact_patch = source_fix_valid and replacement == NEW_ACCURACY_LINE
     patch = "".join(
         difflib.unified_diff(
             stats_before.splitlines(keepends=True),
@@ -1028,6 +1040,14 @@ def source_integrity(
         "tests_sha256_before": tests_before,
         "tests_sha256_after": tests_after,
         "tests_unchanged": tests_before == tests_after,
+        "source_fix_valid": source_fix_valid,
+        "source_fix_variant": (
+            "canonical"
+            if replacement == NEW_ACCURACY_LINE
+            else "equivalent"
+            if replacement == EQUIVALENT_ACCURACY_LINE
+            else None
+        ),
         "exact_source_patch": exact_patch,
         "patch": patch,
     }
@@ -1147,6 +1167,8 @@ def run_arm(
     )
     proxy.start()
     phases: dict[str, Any] = {}
+    posttest: dict[str, Any] | None = None
+    workflow_error: Exception | None = None
     workflow_started = time.perf_counter()
     try:
         model_id = endpoint["model"]
@@ -1204,6 +1226,8 @@ def run_arm(
             phase="main",
             prompt=main_prompt,
         )
+    except Exception as exc:
+        workflow_error = exc
     finally:
         proxy.close()
     workflow_wall = time.perf_counter() - workflow_started
@@ -1212,6 +1236,85 @@ def run_arm(
         integrity["patch"],
         encoding="utf-8",
     )
+    try:
+        calls, call_totals = summarize_calls(
+            proxy.state.records,
+            arm,
+            direct_model,
+            factors,
+        )
+        metrics_error = None
+    except Exception as exc:
+        calls = []
+        call_totals = {
+            "actual_cost_xxx": 0.0,
+            "auto_tokens_glm_reprice_xxx": (
+                0.0 if arm == "auto" else None
+            ),
+            "tokens": {
+                "prompt_tokens": 0,
+                "completion_tokens": 0,
+                "reasoning_tokens": 0,
+                "cached_tokens": 0,
+            },
+            "requests": len(proxy.state.records),
+        }
+        metrics_error = f"{type(exc).__name__}: {exc}"
+    turns = sum(
+        int(phase.get("assistant_turns") or 0)
+        for phase in phases.values()
+    )
+    metrics = {
+        **call_totals,
+        "assistant_turns": turns,
+        "agent_wall_time_seconds": round(
+            sum(
+                float(phase.get("wall_time_seconds") or 0)
+                for phase in phases.values()
+            ),
+            3,
+        ),
+        "workflow_wall_time_seconds": round(workflow_wall, 3),
+        "total_arm_wall_time_seconds": round(
+            time.perf_counter() - total_started,
+            3,
+        ),
+        "complete": workflow_error is None,
+        "cost_coverage_complete": metrics_error is None,
+    }
+    paths = {
+        "arm_root": relative_path(arm_dir, output_root),
+        "state": relative_path(state_dir, output_root),
+        "workspaces": relative_path(workspaces, output_root),
+        "fixture": relative_path(fixture_repo, output_root),
+        "routes": relative_path(arm_dir / "routes.jsonl", output_root),
+    }
+    if workflow_error is not None:
+        return {
+            "status": "error",
+            "execution_position": execution_position,
+            "requested_model": endpoint["model"],
+            "paths": paths,
+            "phases": phases,
+            "quality": {
+                "baseline": baseline,
+                "posttest": posttest,
+                "baseline_exact": None,
+                "posttest_exact": None,
+                "integrity": integrity,
+                "passed": False,
+            },
+            "calls": calls,
+            "metrics": metrics,
+            "error": {
+                "type": type(workflow_error).__name__,
+                "message": str(workflow_error),
+                "metrics_error": metrics_error,
+            },
+            "passed": False,
+        }
+
+    assert posttest is not None
     baseline_counts = baseline["counts"]
     post_counts = posttest["counts"]
     baseline_exact = (
@@ -1235,30 +1338,17 @@ def run_arm(
         )
         == 0
     )
-    calls, call_totals = summarize_calls(
-        proxy.state.records,
-        arm,
-        direct_model,
-        factors,
-    )
-    turns = sum(int(phases[name]["assistant_turns"]) for name in PHASES)
     quality_passed = (
         baseline_exact
         and post_exact
         and integrity["tests_unchanged"]
-        and integrity["exact_source_patch"]
+        and integrity["source_fix_valid"]
     )
     return {
         "status": "completed",
         "execution_position": execution_position,
         "requested_model": endpoint["model"],
-        "paths": {
-            "arm_root": relative_path(arm_dir, output_root),
-            "state": relative_path(state_dir, output_root),
-            "workspaces": relative_path(workspaces, output_root),
-            "fixture": relative_path(fixture_repo, output_root),
-            "routes": relative_path(arm_dir / "routes.jsonl", output_root),
-        },
+        "paths": paths,
         "phases": phases,
         "handoffs": {
             "fixer": {
@@ -1283,19 +1373,7 @@ def run_arm(
             "passed": quality_passed,
         },
         "calls": calls,
-        "metrics": {
-            **call_totals,
-            "assistant_turns": turns,
-            "agent_wall_time_seconds": round(
-                sum(float(phases[name]["wall_time_seconds"]) for name in PHASES),
-                3,
-            ),
-            "workflow_wall_time_seconds": round(workflow_wall, 3),
-            "total_arm_wall_time_seconds": round(
-                time.perf_counter() - total_started,
-                3,
-            ),
-        },
+        "metrics": metrics,
         "passed": quality_passed,
     }
 
@@ -1304,25 +1382,48 @@ def aggregate_summary(pairs: list[dict[str, Any]]) -> dict[str, Any]:
     aggregate: dict[str, Any] = {"arms": {}}
     for arm in ARMS:
         attempted = [pair["arms"].get(arm, {}) for pair in pairs]
-        runs = [
-            pair["arms"][arm]
-            for pair in pairs
-            if pair["arms"].get(arm, {}).get("status") == "completed"
+        completed = [
+            run
+            for run in attempted
+            if run.get("status") == "completed"
+        ]
+        measured = [
+            run
+            for run in attempted
+            if isinstance(run.get("metrics"), dict)
+        ]
+        costed = [
+            run
+            for run in measured
+            if run["metrics"].get("cost_coverage_complete", True)
+        ]
+        repriced = [
+            run
+            for run in costed
+            if run["metrics"].get("auto_tokens_glm_reprice_xxx") is not None
         ]
         aggregate["arms"][arm] = {
             "attempts": len(attempted),
-            "runs": len(runs),
-            "passed": sum(bool(run.get("passed")) for run in runs),
+            "runs": len(completed),
+            "completed": len(completed),
+            "passed": sum(bool(run.get("passed")) for run in attempted),
             "failed_or_incomplete": sum(
                 run.get("status") != "completed" or not run.get("passed")
                 for run in attempted
             ),
-            "requests": sum(int(run["metrics"]["requests"]) for run in runs),
+            "cost_observed_attempts": len(costed),
+            "cost_missing_attempts": len(attempted) - len(costed),
+            "requests": sum(
+                int(run["metrics"]["requests"]) for run in measured
+            ),
             "assistant_turns": sum(
-                int(run["metrics"]["assistant_turns"]) for run in runs
+                int(run["metrics"]["assistant_turns"]) for run in measured
             ),
             "tokens": {
-                key: sum(int(run["metrics"]["tokens"][key]) for run in runs)
+                key: sum(
+                    int(run["metrics"]["tokens"][key])
+                    for run in measured
+                )
                 for key in (
                     "prompt_tokens",
                     "completion_tokens",
@@ -1333,12 +1434,15 @@ def aggregate_summary(pairs: list[dict[str, Any]]) -> dict[str, Any]:
             "workflow_wall_time_seconds": round(
                 sum(
                     float(run["metrics"]["workflow_wall_time_seconds"])
-                    for run in runs
+                    for run in measured
                 ),
                 3,
             ),
             "actual_cost_xxx": round(
-                sum(float(run["metrics"]["actual_cost_xxx"]) for run in runs),
+                sum(
+                    float(run["metrics"]["actual_cost_xxx"])
+                    for run in costed
+                ),
                 8,
             ),
             "auto_tokens_glm_reprice_xxx": (
@@ -1346,21 +1450,31 @@ def aggregate_summary(pairs: list[dict[str, Any]]) -> dict[str, Any]:
                     sum(
                         float(
                             run["metrics"]["auto_tokens_glm_reprice_xxx"]
-                            or 0
                         )
-                        for run in runs
+                        for run in repriced
                     ),
                     8,
                 )
                 if arm == "auto"
                 else None
             ),
+            "auto_reprice_observed_attempts": (
+                len(repriced) if arm == "auto" else None
+            ),
         }
-    matched = [
+    matched_completed = [
         pair
         for pair in pairs
         if all(
             pair["arms"].get(arm, {}).get("status") == "completed"
+            for arm in ARMS
+        )
+    ]
+    matched = [
+        pair
+        for pair in matched_completed
+        if all(
+            pair["arms"].get(arm, {}).get("passed") is True
             for arm in ARMS
         )
     ]
@@ -1384,6 +1498,8 @@ def aggregate_summary(pairs: list[dict[str, Any]]) -> dict[str, Any]:
     aggregate["paired_cost"] = {
         "primary_actual_execution": {
             "completed_matched_pairs": len(matched),
+            "all_completed_matched_pairs": len(matched_completed),
+            "successful_matched_pairs": len(matched),
             "auto_actual_cost_xxx": round(auto_cost, 8),
             "direct_glm_actual_cost_xxx": round(direct_cost, 8),
             "direct_minus_auto_xxx": round(direct_cost - auto_cost, 8),
@@ -1395,6 +1511,7 @@ def aggregate_summary(pairs: list[dict[str, Any]]) -> dict[str, Any]:
         },
         "secondary_auto_token_glm_repricing": {
             "completed_matched_pairs": len(matched),
+            "successful_matched_pairs": len(matched),
             "auto_actual_cost_xxx": round(auto_cost, 8),
             "auto_tokens_repriced_as_glm_xxx": round(repriced, 8),
             "repriced_minus_auto_xxx": round(repriced - auto_cost, 8),
@@ -1421,6 +1538,8 @@ def csv_text(summary: dict[str, Any]) -> str:
         "baseline_passed",
         "post_passed",
         "tests_unchanged",
+        "source_fix_valid",
+        "source_fix_variant",
         "exact_source_patch",
         "requests",
         "assistant_turns",
@@ -1464,6 +1583,16 @@ def csv_text(summary: dict[str, Any]) -> str:
                     ),
                     "tests_unchanged": (
                         (quality.get("integrity") or {}).get("tests_unchanged")
+                    ),
+                    "source_fix_valid": (
+                        (quality.get("integrity") or {}).get(
+                            "source_fix_valid"
+                        )
+                    ),
+                    "source_fix_variant": (
+                        (quality.get("integrity") or {}).get(
+                            "source_fix_variant"
+                        )
                     ),
                     "exact_source_patch": (
                         (quality.get("integrity") or {}).get(
@@ -1529,8 +1658,8 @@ def report_text(summary: dict[str, Any]) -> str:
             "",
             "## Primary: actual executions",
             "",
-            f"- Completed matched pairs: "
-            f"`{primary.get('completed_matched_pairs', fallback_matched)}`",
+            f"- Successful matched pairs: "
+            f"`{primary.get('successful_matched_pairs', primary.get('completed_matched_pairs', fallback_matched))}`",
             f"- Auto actual cost: `{primary['auto_actual_cost_xxx']:.8f} XXX`",
             f"- Direct GLM actual cost: "
             f"`{primary['direct_glm_actual_cost_xxx']:.8f} XXX`",
@@ -1573,19 +1702,27 @@ def verify_summary(
         errors.append("schema_version is incorrect")
     if summary.get("recipe", {}).get("version") != "0.3.2":
         errors.append("recipe version is not 0.3.2")
+    pairs = summary.get("pairs") or []
+    expected_pair_count = int(
+        (summary.get("design") or {}).get("matched_pairs")
+        or len(pairs)
+    )
     plan = summary.get("execution_plan") or []
-    if len(plan) != PAIR_COUNT * len(ARMS):
-        errors.append("execution plan does not contain six arms")
-    for pair_id in range(1, PAIR_COUNT + 1):
+    if len(plan) != expected_pair_count * len(ARMS):
+        errors.append(
+            "execution plan does not contain two arms per matched pair"
+        )
+    for pair_id in range(1, expected_pair_count + 1):
         rows = [item for item in plan if item.get("pair_id") == pair_id]
         if len(rows) != 2 or {item.get("arm") for item in rows} != set(ARMS):
             errors.append(f"pair {pair_id} is not matched")
         positions = sorted(int(item.get("position") or 0) for item in rows)
         if len(positions) == 2 and positions[1] != positions[0] + 1:
             errors.append(f"pair {pair_id} arms are not sequential")
-    pairs = summary.get("pairs") or []
-    if len(pairs) != PAIR_COUNT:
-        errors.append("summary does not contain exactly three pairs")
+    if len(pairs) != expected_pair_count:
+        errors.append(
+            "summary pair count does not match design.matched_pairs"
+        )
     seen_paths: set[str] = set()
     for pair in pairs:
         for arm in ARMS:
@@ -1608,9 +1745,12 @@ def verify_summary(
             integrity = quality.get("integrity") or {}
             if not integrity.get("tests_unchanged"):
                 errors.append(f"pair {pair.get('pair_id')} {arm} changed tests")
-            if not integrity.get("exact_source_patch"):
+            if not integrity.get(
+                "source_fix_valid",
+                integrity.get("exact_source_patch"),
+            ):
                 errors.append(
-                    f"pair {pair.get('pair_id')} {arm} source patch was not exact"
+                    f"pair {pair.get('pair_id')} {arm} source fix was not minimal"
                 )
             phases = run.get("phases") or {}
             if set(phases) != set(PHASES):
