@@ -27,6 +27,7 @@ services:
       OPENCLAW_WORKSHOP_STATE_DIR: /workspace/state/openclaw
       OPENCLAW_WORKSHOP_WORKSPACES: /workspace/agents
       OPENCLAW_WORKSHOP_DEMO_ROOT: /workspace/demo
+      OPENCLAW_PROVIDER_ID: "${OPENCLAW_PROVIDER_ID:-vllm-sr}"
       AUTO_BASE_URL: "${AUTO_BASE_URL:-https://api.134.199.192.106.sslip.io/v1}"
       AUTO_MODEL: "${AUTO_MODEL:-vllm-sr/auto}"
       GLM_BASE_URL: "${GLM_BASE_URL:-https://api.134.199.192.106.sslip.io/glm/v1}"

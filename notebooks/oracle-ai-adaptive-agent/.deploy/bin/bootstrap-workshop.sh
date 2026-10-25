@@ -6,6 +6,7 @@ set -euo pipefail
 : "${WORKSHOP_RUNTIME_DIR:=/workspace/runtime}"
 : "${OPENCLAW_STATE_DIR:=/workspace/state/openclaw}"
 : "${OPENCLAW_WORKSHOP_WORKSPACES:=/workspace/agents}"
+: "${OPENCLAW_PROVIDER_ID:=vllm-sr}"
 : "${AUTO_MODEL:=vllm-sr/auto}"
 
 mkdir -p \
@@ -36,7 +37,7 @@ onboard_workspace() {
     --auth-choice custom-api-key \
     --custom-base-url http://127.0.0.1:19090/v1 \
     --custom-model-id "$AUTO_MODEL" \
-    --custom-provider-id vllm-sr \
+    --custom-provider-id "$OPENCLAW_PROVIDER_ID" \
     --custom-compatibility openai \
     --custom-api-key proxy-local \
     --secret-input-mode plaintext \
@@ -89,6 +90,15 @@ else
     rm -rf "$seed_root"
   fi
 fi
+
+# Model references are provider/model. AUTO_MODEL is also the literal model
+# id sent to the OpenAI-compatible endpoint, so an upstream id containing a
+# slash needs the provider prefix retained explicitly. Without this canonical
+# ref, OpenClaw can select "vllm-sr/auto" as provider=vllm-sr, model=auto,
+# then fall back to the actual configured model id "vllm-sr/auto".
+openclaw config set \
+  agents.defaults.model.primary \
+  "$OPENCLAW_PROVIDER_ID/$AUTO_MODEL"
 
 openclaw config set memory.search.enabled false
 openclaw config set tools.profile coding

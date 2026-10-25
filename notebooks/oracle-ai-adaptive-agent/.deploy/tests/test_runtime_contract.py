@@ -89,6 +89,9 @@ def test_bootstrap_preserves_openclaw_first_run_templates():
     assert "--skip-bootstrap" not in script
     assert "AGENTS.md SOUL.md IDENTITY.md USER.md BOOTSTRAP.md" in script
     assert 'grep -q "^## First Run"' in script
+    assert 'OPENCLAW_PROVIDER_ID:=vllm-sr' in script
+    assert '"$OPENCLAW_PROVIDER_ID/$AUTO_MODEL"' in script
+    assert "agents.defaults.model.primary" in script
 
 
 def test_policy_comparison_artifact_is_notebook_ready():
