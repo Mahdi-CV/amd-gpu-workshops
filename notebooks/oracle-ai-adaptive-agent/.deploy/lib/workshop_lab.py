@@ -451,9 +451,14 @@ pytest suite, and report the result.
     def clear_routes(self) -> None:
         self.routes.parent.mkdir(parents=True, exist_ok=True)
         self.routes.write_text("", encoding="utf-8")
-        self.mark_phase("unmarked")
+        self.mark_phase("workshop", announce=False)
 
-    def mark_phase(self, phase: str) -> dict[str, Any]:
+    def mark_phase(
+        self,
+        phase: str,
+        *,
+        announce: bool = True,
+    ) -> dict[str, Any]:
         value = {
             "phase": phase,
             "timestamp": time.time(),
@@ -462,7 +467,8 @@ pytest suite, and report the result.
             json.dumps(value, indent=2) + "\n",
             encoding="utf-8",
         )
-        print("Phase:", phase)
+        if announce:
+            print("Phase:", phase)
         return value
 
     @staticmethod

@@ -32,8 +32,7 @@ def test_multi_agent_notebook_preserves_story_and_uses_vllm():
     ) in text
     assert "https://github.com/Mahdi-CV/catch-the-bug.git" in text
     assert "fixer" in text.lower()
-    assert 'lab.mark_phase("review_panel")' in text
-    assert 'lab.mark_phase("fixer_challenge")' in text
+    assert "lab.mark_phase(" not in text
     assert "lab.show_routing_summary(" in text
     assert 'source="live"' in text
     assert "agents.entries.main.subagents.allowAgents" in text
