@@ -75,13 +75,19 @@ Expected live routes:
 
 | Phase | Decision | Model |
 | --- | --- | --- |
-| `bug_reviewer` | `code` | `qwen/qwen3.8-flash-next` |
-| `test_reviewer` | `code` | `qwen/qwen3.8-flash-next` |
-| `fixer` | `agentic` or `recovery` | `zai/glm-5.3-flash` |
+| `bug_reviewer` | `code_agentic` or `code` | `qwen/qwen3.8-flash-next` |
+| `test_reviewer` | `code_agentic` or `code` | `qwen/qwen3.8-flash-next` |
+| `fixer` | `code_agentic` | `qwen/qwen3.8-flash-next` |
+| `fixer` continuation | `recovery` | `zai/glm-5.3-flash` |
 | `main` | `fast` | `qwen/qwen3.8-27b` |
 
 The reviewers and `main` may declare three minimal-profile tools. That is
 normal. They should not actually invoke filesystem or execution tools.
+
+Before testing another deployment, follow
+`.deploy/router/decision-balance-code-agentic/README.md` and run all four route
+probes. Do not assume the overlay is active merely because `vllm-sr/auto`
+exists.
 
 ## 4. Run the policy comparison
 

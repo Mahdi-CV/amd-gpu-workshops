@@ -29,9 +29,10 @@ All agents use the normal `vllm-sr/auto` provider:
 Expected Decision Balance `0.3.2` routes:
 
 ```text
-reviewers → code    → Qwen3.8-Flash-Next
-fixer     → agentic → GLM-5.3-Flash
-main      → fast    → Qwen3.8-27B
+reviewers → code_agentic → Qwen3.8-Flash-Next
+fixer     → code_agentic → Qwen3.8-Flash-Next
+fixer     → recovery     → GLM-5.3-Flash
+main      → fast         → Qwen3.8-27B
 ```
 
 ## Quality gate
@@ -59,6 +60,11 @@ Same-token backend-mix estimate: 14.81%
 `XXX` is a versioned relative-compute unit, not money. Open
 `.deploy/artifacts/policy-analysis.md` for the complete methodology, per-pair
 results, route distribution, and limitations.
+
+The tested priority-750 `code_agentic` overlay is under
+`.deploy/router/decision-balance-code-agentic/`. See
+`.deploy/artifacts/code-agentic-live-validation-20261025.md` for its live
+MI300X review-panel and Fixer validation.
 
 ## Runtime commands
 

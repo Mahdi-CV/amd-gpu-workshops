@@ -72,6 +72,7 @@ COPY workshop.ipynb README.md /opt/workshop/
 COPY .deploy/bin/ /opt/workshop/.deploy/bin/
 COPY .deploy/lib/ /opt/workshop/.deploy/lib/
 COPY .deploy/tests/ /opt/workshop/.deploy/tests/
+COPY .deploy/router/ /opt/workshop/.deploy/router/
 COPY .deploy/fixture/ /opt/workshop/.deploy/fixture/
 COPY .deploy/artifacts/ /opt/workshop/.deploy/artifacts/
 COPY .deploy/config/ /opt/workshop/.deploy/config/

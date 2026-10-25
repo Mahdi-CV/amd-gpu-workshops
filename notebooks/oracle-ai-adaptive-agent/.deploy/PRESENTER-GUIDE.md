@@ -39,13 +39,16 @@ side:   vLLM-SR Dashboard → Insights
 ## Expected routes
 
 ```text
-bug_reviewer   code      Qwen3.8-Flash-Next
-test_reviewer  code      Qwen3.8-Flash-Next
-fixer          agentic   GLM-5.3-Flash
-main           fast      Qwen3.8-27B, thinking off
+bug_reviewer   code_agentic   Qwen3.8-Flash-Next
+test_reviewer  code_agentic   Qwen3.8-Flash-Next
+fixer start    code_agentic   Qwen3.8-Flash-Next
+fixer retry    recovery       GLM-5.3-Flash
+main           fast           Qwen3.8-27B, thinking off
 ```
 
-Fixer continuations may use `recovery`; they should remain on GLM.
+The key reveal is that code-oriented tool use no longer automatically means
+GLM. Flash-Next handles code work; GLM remains visible on recovery and general
+agentic orchestration.
 
 ## Quality language
 
@@ -95,6 +98,17 @@ Current verified snapshot:
 
 The single direct-GLM failure was a terminal malformed tool call. The failed
 attempt's observed compute is included in the failure-inclusive analysis.
+
+Separate live validation of the `code_agentic` overlay showed:
+
+| Workflow | Result |
+| --- | ---: |
+| Review-panel relative-compute reduction | 41.86% |
+| Review-panel model mix | 18 Flash / 5 GLM |
+| Fixer relative-compute reduction | 27.79% |
+| Fixer quality | 107 tests passed |
+
+These are observed runs, not general benchmark claims.
 
 ## Dashboard
 

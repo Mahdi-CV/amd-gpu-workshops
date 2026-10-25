@@ -132,6 +132,25 @@ Results belong under `/workspace/results`. Gateway logs can contain model
 output; treat them as sensitive and do not include them in a handoff without
 review. Container logs rotate at 10 MiB with three files retained.
 
+## Deploy the code-agentic Decision Balance overlay
+
+The portable overlay under
+[`router/decision-balance-code-agentic/`](router/decision-balance-code-agentic/)
+adds a priority-750 route for code-oriented tool use:
+
+```text
+recovery       -> GLM
+code_agentic   -> Flash-Next
+agentic        -> GLM
+code           -> Flash-Next
+fast           -> Qwen3.8-27B
+```
+
+It patches an existing Decision Balance config instead of replacing deployment
+specific endpoints, guards, observability, credentials, or storage settings.
+Its README covers idempotent patching, validation, management-API planning,
+hot apply, route probes, and rollback.
+
 ## Verify the CPU-only boundary
 
 ```bash

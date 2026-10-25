@@ -4,6 +4,7 @@ ipykernel==7.4.0
 jupyterlab==4.6.4
 psutil==7.2.2
 pytest==9.1.1
+PyYAML==6.0.3
 readchar==4.2.2
 requests==2.34.2
 rich==15.0.0
