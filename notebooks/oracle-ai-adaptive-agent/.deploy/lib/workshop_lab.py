@@ -27,6 +27,13 @@ ACCEPTED_ACCURACY_LINES = (
     NEW_ACCURACY_LINE,
     EQUIVALENT_ACCURACY_LINE,
 )
+MODEL_LABELS = {
+    "qwen/qwen3.8-flash-next": "Qwen3.8-Flash-Next",
+    "qwen/qwen3.8-27b": "Qwen3.8-27B",
+    "zai/glm-5.3-flash": "GLM-5.3-Flash",
+}
+GLM_PROMPT_RATE = 0.44
+GLM_COMPLETION_RATE = 4.35
 
 
 class WorkshopLab:
@@ -602,6 +609,17 @@ pytest suite, and report the result.
         for row in rows:
             headers = row.get("routing_headers") or {}
             usage = row.get("usage") or {}
+            projections = str(
+                headers.get("x-vsr-matched-projections") or ""
+            )
+            effort = next(
+                (
+                    item.strip().removeprefix("effort_")
+                    for item in projections.split(",")
+                    if item.strip().startswith("effort_")
+                ),
+                None,
+            )
             report.append(
                 {
                     "call": row.get("request_id"),
@@ -613,6 +631,7 @@ pytest suite, and report the result.
                         or row.get("response_model")
                     ),
                     "reasoning": headers.get("x-vsr-selected-reasoning"),
+                    "effort": effort,
                     "tools": row.get("tool_count"),
                     "prompt_tokens": usage.get("prompt_tokens"),
                     "completion_tokens": usage.get("completion_tokens"),
@@ -638,31 +657,201 @@ pytest suite, and report the result.
         print("Showing VERIFIED REHEARSAL data, not the live session.")
         return report
 
-    def cost_summary(self, *, source: str = "live") -> dict[str, Any]:
-        rows = self.route_report(source=source)
+    @staticmethod
+    def _routed_model_calls(
+        rows: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        return [
+            row
+            for row in rows
+            if row.get("model")
+            and (
+                row.get("prompt_tokens") is not None
+                or row.get("completion_tokens") is not None
+            )
+        ]
+
+    def routing_summary(self, *, source: str = "live") -> dict[str, Any]:
+        rows = self._routed_model_calls(self.route_report(source=source))
         if not rows:
             return {"source": source, "status": "no route data"}
-        missing = [row["call"] for row in rows if row.get("cost_xxx") is None]
+
+        by_model: dict[str, dict[str, Any]] = {}
+        effort_counts: dict[str, int] = {}
+        for row in rows:
+            model = str(row["model"])
+            item = by_model.setdefault(
+                model,
+                {
+                    "model": model,
+                    "label": MODEL_LABELS.get(model, model),
+                    "calls": 0,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "relative_compute_xxx": 0.0,
+                    "efforts": {},
+                },
+            )
+            item["calls"] += 1
+            for key in (
+                "prompt_tokens",
+                "completion_tokens",
+                "reasoning_tokens",
+            ):
+                item[key] += int(row.get(key) or 0)
+            item["relative_compute_xxx"] += float(
+                row.get("cost_xxx") or 0
+            )
+
+            effort = str(
+                row.get("effort")
+                or ("off" if row.get("reasoning") == "off" else "on")
+            )
+            item["efforts"][effort] = item["efforts"].get(effort, 0) + 1
+            effort_counts[effort] = effort_counts.get(effort, 0) + 1
+
+        total_calls = len(rows)
+        model_rows = []
+        for item in by_model.values():
+            item["call_share_percent"] = round(
+                item["calls"] / total_calls * 100,
+                1,
+            )
+            item["relative_compute_xxx"] = round(
+                item["relative_compute_xxx"],
+                8,
+            )
+            item["efforts"] = dict(sorted(item["efforts"].items()))
+            model_rows.append(item)
+        model_rows.sort(key=lambda item: (-item["calls"], item["label"]))
+
+        missing = [
+            row["call"] for row in rows if row.get("cost_xxx") is None
+        ]
         routed = sum(float(row.get("cost_xxx") or 0) for row in rows)
         all_glm = sum(
             (
-                int(row.get("prompt_tokens") or 0) * 0.44
-                + int(row.get("completion_tokens") or 0) * 4.35
+                int(row.get("prompt_tokens") or 0) * GLM_PROMPT_RATE
+                + int(row.get("completion_tokens") or 0)
+                * GLM_COMPLETION_RATE
             )
             / 1_000_000
             for row in rows
         )
+        reduction = (
+            round((1 - routed / all_glm) * 100, 2)
+            if all_glm and not missing
+            else None
+        )
+        return {
+            "source": source,
+            "total_calls": total_calls,
+            "models": model_rows,
+            "reasoning_efforts": dict(sorted(effort_counts.items())),
+            "relative_compute": {
+                "vllm_sr_auto_xxx": round(routed, 8),
+                "all_glm_flash_max_same_tokens_xxx": round(all_glm, 8),
+                "reduction_percent": reduction,
+                "routed_share_of_glm_baseline_percent": (
+                    round(routed / all_glm * 100, 2)
+                    if all_glm and not missing
+                    else None
+                ),
+                "incomplete_cost_calls": missing,
+                "baseline": (
+                    "The same observed prompt and completion tokens priced "
+                    "at the Decision Balance GLM-5.3-Flash relative-compute "
+                    "rate. This conservative baseline does not add extra "
+                    "tokens that max reasoning might generate."
+                ),
+            },
+        }
+
+    def show_routing_summary(
+        self,
+        *,
+        source: str = "live",
+        title: str = "OpenClaw routing summary",
+    ) -> dict[str, Any]:
+        summary = self.routing_summary(source=source)
+        if summary.get("status") == "no route data":
+            print("No routed model calls yet. Run the TUI turns first.")
+            return summary
+
+        print("=" * 78)
+        print(title)
+        print("=" * 78)
+        print(f"Total routed LLM calls: {summary['total_calls']}")
+        print()
+        print(
+            f"{'Selected model':<28}"
+            f"{'Calls':>8}"
+            f"{'Share':>10}"
+            f"{'Reasoning effort':>24}"
+        )
+        print("-" * 78)
+        for row in summary["models"]:
+            efforts = ", ".join(
+                f"{name}={count}"
+                for name, count in row["efforts"].items()
+            )
+            print(
+                f"{row['label']:<28}"
+                f"{row['calls']:>8}"
+                f"{row['call_share_percent']:>9.1f}%"
+                f"{efforts:>24}"
+            )
+
+        compute = summary["relative_compute"]
+        print()
+        print("Relative compute (XXX; lower is better)")
+        print("-" * 78)
+        print(
+            f"{'vLLM-SR auto':<48}"
+            f"{compute['vllm_sr_auto_xxx']:>18.8f} XXX"
+        )
+        print(
+            f"{'All GLM-5.3-Flash @ max (same tokens)':<48}"
+            f"{compute['all_glm_flash_max_same_tokens_xxx']:>18.8f} XXX"
+        )
+        if compute["reduction_percent"] is not None:
+            print(
+                f"{'Relative compute avoided':<48}"
+                f"{compute['reduction_percent']:>17.2f}%"
+            )
+            print(
+                f"{'Auto used this share of the GLM baseline':<48}"
+                f"{compute['routed_share_of_glm_baseline_percent']:>17.2f}%"
+            )
+        else:
+            print(
+                "Compute reduction unavailable because one or more routed "
+                "calls had no token-cost record."
+            )
+        print()
+        print(
+            "* Conservative same-token comparison: it does not assume the "
+            "additional reasoning tokens an all-GLM/max run may generate."
+        )
+        print("* XXX is relative compute, not dollars.")
+        return summary
+
+    def cost_summary(self, *, source: str = "live") -> dict[str, Any]:
+        summary = self.routing_summary(source=source)
+        if summary.get("status") == "no route data":
+            return {"source": source, "status": "no route data"}
+        compute = summary["relative_compute"]
         result = {
             "source": source,
-            "calls": len(rows),
-            "routed_estimated_xxx": round(routed, 8),
-            "glm_repricing_of_same_tokens_xxx": round(all_glm, 8),
-            "estimated_reduction_percent": (
-                round((1 - routed / all_glm) * 100, 2)
-                if all_glm and not missing
-                else None
-            ),
-            "incomplete_cost_calls": missing,
+            "calls": summary["total_calls"],
+            "routed_estimated_xxx": compute["vllm_sr_auto_xxx"],
+            "glm_repricing_of_same_tokens_xxx": compute[
+                "all_glm_flash_max_same_tokens_xxx"
+            ],
+            "estimated_reduction_percent": compute["reduction_percent"],
+            "incomplete_cost_calls": compute["incomplete_cost_calls"],
+            "qualification": compute["baseline"],
         }
         return result
 

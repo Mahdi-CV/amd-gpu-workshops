@@ -34,9 +34,11 @@ def test_multi_agent_notebook_preserves_story_and_uses_vllm():
     assert "fixer" in text.lower()
     assert 'lab.mark_phase("review_panel")' in text
     assert 'lab.mark_phase("fixer_challenge")' in text
-    assert 'lab.route_report(source="live")' in text
+    assert "lab.show_routing_summary(" in text
+    assert 'source="live"' in text
     assert "agents.entries.main.subagents.allowAgents" in text
     assert "agents.entries.main.tools.alsoAllow" in text
+    assert "openclaw agents add <name>" in text
     assert body["metadata"]["title"].startswith("AI Agents, Powered by AMD")
 
 
@@ -56,10 +58,19 @@ def test_multi_agent_notebook_removes_old_backend_assumptions():
 
 
 def test_multi_agent_notebook_is_clean_for_participants():
-    body, _ = notebook_text(NOTEBOOK)
+    body, text = notebook_text(NOTEBOOK)
     code_cells = [
         cell for cell in body["cells"] if cell["cell_type"] == "code"
     ]
     assert code_cells
     assert all(cell.get("execution_count") is None for cell in code_cells)
     assert all((cell.get("outputs") or []) == [] for cell in code_cells)
+    assert "This file will appear after" not in text
+
+
+def test_multi_agent_notebook_uses_aggregate_route_reveal():
+    _, text = notebook_text(NOTEBOOK)
+    assert "Total routed LLM calls" in text
+    assert "all-GLM-5.3-Flash" in text
+    assert "panel_routes = lab.route_report" not in text
+    assert "live_routes = lab.route_report" not in text
