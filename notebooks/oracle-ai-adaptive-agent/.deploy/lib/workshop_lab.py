@@ -858,8 +858,8 @@ pytest suite, and report the result.
         print(
             f"{'Selected model':<28}"
             f"{'Calls':>8}"
-            f"{'Share':>10}"
-            f"{'Detected effort':>24}"
+            f"{'Share':>10}  "
+            f"{'Detected effort':<24}"
         )
         print("-" * 78)
         for row in summary["models"]:
@@ -870,8 +870,8 @@ pytest suite, and report the result.
             print(
                 f"{row['label']:<28}"
                 f"{row['calls']:>8}"
-                f"{row['call_share_percent']:>9.1f}%"
-                f"{efforts:>24}"
+                f"{row['call_share_percent']:>9.1f}%  "
+                f"{efforts:<24}"
             )
 
         compute = summary["relative_compute"]
