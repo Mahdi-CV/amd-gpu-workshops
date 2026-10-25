@@ -12,7 +12,13 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from aiohttp import ClientError, ClientSession, ClientTimeout, web
+from aiohttp import (
+    ClientConnectionResetError,
+    ClientError,
+    ClientSession,
+    ClientTimeout,
+    web,
+)
 
 from endpoint_access import endpoint_and_key
 
@@ -282,6 +288,22 @@ async def forward(request: web.Request) -> web.StreamResponse:
     started = time.perf_counter()
     first_byte: float | None = None
     response_buffer = bytearray()
+    client_gone = False
+
+    async def send(outgoing: web.StreamResponse, chunk: bytes | None) -> None:
+        # OpenClaw can close a stream right after the last event. Keep reading
+        # upstream so the route row (usage, routing headers) is still logged.
+        nonlocal client_gone
+        if client_gone:
+            return
+        try:
+            if chunk is None:
+                await outgoing.write_eof()
+            else:
+                await outgoing.write(chunk)
+        except (ConnectionResetError, ClientConnectionResetError):
+            client_gone = True
+
     try:
         async with state.session.request(
             request.method,
@@ -298,13 +320,16 @@ async def forward(request: web.Request) -> web.StreamResponse:
                 status=upstream.status,
                 headers=response_headers,
             )
-            await outgoing.prepare(request)
+            try:
+                await outgoing.prepare(request)
+            except (ConnectionResetError, ClientConnectionResetError):
+                client_gone = True
             async for chunk in upstream.content.iter_chunked(64 * 1024):
                 if first_byte is None:
                     first_byte = time.perf_counter() - started
                 response_buffer.extend(chunk)
-                await outgoing.write(chunk)
-            await outgoing.write_eof()
+                await send(outgoing, chunk)
+            await send(outgoing, None)
             status = upstream.status
             content_type = upstream.headers.get("Content-Type", "")
             routing_headers = {
