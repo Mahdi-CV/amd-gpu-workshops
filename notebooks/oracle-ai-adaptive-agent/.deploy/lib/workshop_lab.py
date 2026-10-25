@@ -21,6 +21,20 @@ OLD_ACCURACY_LINE = (
     "    return round((correct // (total_typed + 1)) * 100, 1)"
 )
 NEW_ACCURACY_LINE = "    return round((correct / total_typed) * 100, 1)"
+EQUIVALENT_ACCURACY_LINE = (
+    "    return round(correct / total_typed * 100, 1)"
+)
+ACCEPTED_ACCURACY_LINES = (
+    NEW_ACCURACY_LINE,
+    EQUIVALENT_ACCURACY_LINE,
+)
+MODEL_LABELS = {
+    "qwen/qwen3.8-flash-next": "Qwen3.8-Flash-Next",
+    "qwen/qwen3.8-27b": "Qwen3.8-27B",
+    "zai/glm-5.3-flash": "GLM-5.3-Flash",
+}
+GLM_PROMPT_RATE = 0.44
+GLM_COMPLETION_RATE = 4.35
 
 
 def same_program(left: str, right: str) -> bool:
@@ -33,6 +47,34 @@ def same_program(left: str, right: str) -> bool:
         return ast.dump(ast.parse(left)) == ast.dump(ast.parse(right))
     except SyntaxError:
         return False
+
+
+def minimal_ast_equivalent_fix(
+    before: str,
+    after: str,
+    expected: str,
+) -> bool:
+    """Accept semantic formatting variants only on the intended source line."""
+    before_lines = before.splitlines()
+    after_lines = after.splitlines()
+    if len(before_lines) != len(after_lines):
+        return False
+    changed = [
+        index
+        for index, (old, new) in enumerate(
+            zip(before_lines, after_lines, strict=True)
+        )
+        if old != new
+    ]
+    targets = [
+        index
+        for index, line in enumerate(before_lines)
+        if line == OLD_ACCURACY_LINE
+    ]
+    return changed == targets and len(targets) == 1 and same_program(
+        after,
+        expected,
+    )
 
 
 class WorkshopLab:
@@ -66,6 +108,9 @@ class WorkshopLab:
         self.verification_file = self.runtime / "verification.json"
         self.rehearsal_file = (
             self.root / ".deploy/artifacts/simple-route-results.json"
+        )
+        self.policy_analysis_file = (
+            self.root / ".deploy/artifacts/policy-analysis.json"
         )
         self.openclaw = shutil.which("openclaw") or "openclaw"
         self.auto_model = os.getenv("AUTO_MODEL", "vllm-sr/auto")
@@ -447,9 +492,14 @@ pytest suite, and report the result.
     def clear_routes(self) -> None:
         self.routes.parent.mkdir(parents=True, exist_ok=True)
         self.routes.write_text("", encoding="utf-8")
-        self.mark_phase("unmarked")
+        self.mark_phase("workshop", announce=False)
 
-    def mark_phase(self, phase: str) -> dict[str, Any]:
+    def mark_phase(
+        self,
+        phase: str,
+        *,
+        announce: bool = True,
+    ) -> dict[str, Any]:
         value = {
             "phase": phase,
             "timestamp": time.time(),
@@ -458,7 +508,8 @@ pytest suite, and report the result.
             json.dumps(value, indent=2) + "\n",
             encoding="utf-8",
         )
-        print("Phase:", phase)
+        if announce:
+            print("Phase:", phase)
         return value
 
     @staticmethod
@@ -525,15 +576,35 @@ pytest suite, and report the result.
             if fixture_hashes.get(key) != demo_hashes.get(key)
         )
         stats_text = (self.demo_repo / "stats.py").read_text(encoding="utf-8")
-        expected_stats = (self.fixture / "stats.py").read_text(
+        fixture_stats = (self.fixture / "stats.py").read_text(
             encoding="utf-8"
-        ).replace(OLD_ACCURACY_LINE, NEW_ACCURACY_LINE, 1)
-        exact_patch = changed == ["stats.py"] and (
+        )
+        replacement = next(
             (
-                OLD_ACCURACY_LINE not in stats_text
-                and NEW_ACCURACY_LINE in stats_text
-            )
-            or same_program(stats_text, expected_stats)
+                line
+                for line in ACCEPTED_ACCURACY_LINES
+                if stats_text
+                == fixture_stats.replace(OLD_ACCURACY_LINE, line, 1)
+            ),
+                None,
+        )
+        expected_stats = fixture_stats.replace(
+            OLD_ACCURACY_LINE,
+            NEW_ACCURACY_LINE,
+            1,
+        )
+        ast_equivalent = minimal_ast_equivalent_fix(
+            fixture_stats,
+            stats_text,
+            expected_stats,
+        )
+        source_fix_valid = (
+            fixture_stats.count(OLD_ACCURACY_LINE) == 1
+            and (replacement is not None or ast_equivalent)
+            and changed == ["stats.py"]
+        )
+        exact_patch = (
+            source_fix_valid and replacement == NEW_ACCURACY_LINE
         )
         value = {
             "pytest_returncode": tests.returncode,
@@ -548,6 +619,15 @@ pytest suite, and report the result.
             "contains_107_passed": "107 passed" in tests.stdout,
             "tests_unchanged": tests_unchanged,
             "changed_files": changed,
+            "source_fix_valid": source_fix_valid,
+            "source_fix_variant": (
+                "canonical"
+                if replacement == NEW_ACCURACY_LINE
+                else "equivalent"
+                if replacement == EQUIVALENT_ACCURACY_LINE
+                or ast_equivalent
+                else None
+            ),
             "exact_source_patch": exact_patch,
         }
         value["passed"] = all(
@@ -555,7 +635,7 @@ pytest suite, and report the result.
                 value["pytest_returncode"] == 0,
                 value["contains_107_passed"],
                 value["tests_unchanged"],
-                value["exact_source_patch"],
+                value["source_fix_valid"],
             )
         )
         self.verification_file.write_text(
@@ -587,6 +667,17 @@ pytest suite, and report the result.
         for row in rows:
             headers = row.get("routing_headers") or {}
             usage = row.get("usage") or {}
+            projections = str(
+                headers.get("x-vsr-matched-projections") or ""
+            )
+            effort = next(
+                (
+                    item.strip().removeprefix("effort_")
+                    for item in projections.split(",")
+                    if item.strip().startswith("effort_")
+                ),
+                None,
+            )
             report.append(
                 {
                     "call": row.get("request_id"),
@@ -598,6 +689,7 @@ pytest suite, and report the result.
                         or row.get("response_model")
                     ),
                     "reasoning": headers.get("x-vsr-selected-reasoning"),
+                    "effort": effort,
                     "tools": row.get("tool_count"),
                     "prompt_tokens": usage.get("prompt_tokens"),
                     "completion_tokens": usage.get("completion_tokens"),
@@ -623,32 +715,261 @@ pytest suite, and report the result.
         print("Showing VERIFIED REHEARSAL data, not the live session.")
         return report
 
-    def cost_summary(self, *, source: str = "live") -> dict[str, Any]:
-        rows = self.route_report(source=source)
+    @staticmethod
+    def _routed_model_calls(
+        rows: list[dict[str, Any]],
+    ) -> list[dict[str, Any]]:
+        return [
+            row
+            for row in rows
+            if row.get("model")
+            and (
+                row.get("prompt_tokens") is not None
+                or row.get("completion_tokens") is not None
+            )
+        ]
+
+    def routing_summary(self, *, source: str = "live") -> dict[str, Any]:
+        rows = self._routed_model_calls(self.route_report(source=source))
         if not rows:
             return {"source": source, "status": "no route data"}
-        missing = [row["call"] for row in rows if row.get("cost_xxx") is None]
+
+        by_model: dict[str, dict[str, Any]] = {}
+        effort_counts: dict[str, int] = {}
+        for row in rows:
+            model = str(row["model"])
+            item = by_model.setdefault(
+                model,
+                {
+                    "model": model,
+                    "label": MODEL_LABELS.get(model, model),
+                    "calls": 0,
+                    "prompt_tokens": 0,
+                    "completion_tokens": 0,
+                    "reasoning_tokens": 0,
+                    "relative_compute_xxx": 0.0,
+                    "efforts": {},
+                },
+            )
+            item["calls"] += 1
+            for key in (
+                "prompt_tokens",
+                "completion_tokens",
+                "reasoning_tokens",
+            ):
+                item[key] += int(row.get(key) or 0)
+            item["relative_compute_xxx"] += float(
+                row.get("cost_xxx") or 0
+            )
+
+            effort = str(
+                row.get("effort")
+                or ("off" if row.get("reasoning") == "off" else "on")
+            )
+            item["efforts"][effort] = item["efforts"].get(effort, 0) + 1
+            effort_counts[effort] = effort_counts.get(effort, 0) + 1
+
+        total_calls = len(rows)
+        model_rows = []
+        for item in by_model.values():
+            item["call_share_percent"] = round(
+                item["calls"] / total_calls * 100,
+                1,
+            )
+            item["relative_compute_xxx"] = round(
+                item["relative_compute_xxx"],
+                8,
+            )
+            item["efforts"] = dict(sorted(item["efforts"].items()))
+            model_rows.append(item)
+        model_rows.sort(key=lambda item: (-item["calls"], item["label"]))
+
+        missing = [
+            row["call"] for row in rows if row.get("cost_xxx") is None
+        ]
         routed = sum(float(row.get("cost_xxx") or 0) for row in rows)
         all_glm = sum(
             (
-                int(row.get("prompt_tokens") or 0) * 0.44
-                + int(row.get("completion_tokens") or 0) * 4.35
+                int(row.get("prompt_tokens") or 0) * GLM_PROMPT_RATE
+                + int(row.get("completion_tokens") or 0)
+                * GLM_COMPLETION_RATE
             )
             / 1_000_000
             for row in rows
         )
+        reduction = (
+            round((1 - routed / all_glm) * 100, 2)
+            if all_glm and not missing
+            else None
+        )
+        return {
+            "source": source,
+            "total_calls": total_calls,
+            "models": model_rows,
+            "reasoning_efforts": dict(sorted(effort_counts.items())),
+            "relative_compute": {
+                "vllm_sr_auto_xxx": round(routed, 8),
+                "all_glm_flash_max_same_tokens_xxx": round(all_glm, 8),
+                "reduction_percent": reduction,
+                "routed_share_of_glm_baseline_percent": (
+                    round(routed / all_glm * 100, 2)
+                    if all_glm and not missing
+                    else None
+                ),
+                "incomplete_cost_calls": missing,
+                "baseline": (
+                    "The same observed prompt and completion tokens priced "
+                    "at the Decision Balance GLM-5.3-Flash relative-compute "
+                    "rate. This conservative baseline does not add extra "
+                    "tokens that max reasoning might generate."
+                ),
+            },
+        }
+
+    def show_routing_summary(
+        self,
+        *,
+        source: str = "live",
+        title: str = "OpenClaw routing summary",
+    ) -> dict[str, Any]:
+        summary = self.routing_summary(source=source)
+        if summary.get("status") == "no route data":
+            print("No routed model calls yet. Run the TUI turns first.")
+            return summary
+
+        print("=" * 78)
+        print(title)
+        print("=" * 78)
+        print(f"Total routed LLM calls: {summary['total_calls']}")
+        print()
+        print(
+            f"{'Selected model':<28}"
+            f"{'Calls':>8}"
+            f"{'Share':>10}"
+            f"{'Reasoning effort':>24}"
+        )
+        print("-" * 78)
+        for row in summary["models"]:
+            efforts = ", ".join(
+                f"{name}={count}"
+                for name, count in row["efforts"].items()
+            )
+            print(
+                f"{row['label']:<28}"
+                f"{row['calls']:>8}"
+                f"{row['call_share_percent']:>9.1f}%"
+                f"{efforts:>24}"
+            )
+
+        compute = summary["relative_compute"]
+        print()
+        print("Relative compute (XXX; lower is better)")
+        print("-" * 78)
+        print(
+            f"{'vLLM-SR auto':<48}"
+            f"{compute['vllm_sr_auto_xxx']:>18.8f} XXX"
+        )
+        print(
+            f"{'All GLM-5.3-Flash @ max (same tokens)':<48}"
+            f"{compute['all_glm_flash_max_same_tokens_xxx']:>18.8f} XXX"
+        )
+        if compute["reduction_percent"] is not None:
+            print(
+                f"{'Relative compute avoided':<48}"
+                f"{compute['reduction_percent']:>17.2f}%"
+            )
+            print(
+                f"{'Auto used this share of the GLM baseline':<48}"
+                f"{compute['routed_share_of_glm_baseline_percent']:>17.2f}%"
+            )
+        else:
+            print(
+                "Compute reduction unavailable because one or more routed "
+                "calls had no token-cost record."
+            )
+        print()
+        print(
+            "* Conservative same-token comparison: it does not assume the "
+            "additional reasoning tokens an all-GLM/max run may generate."
+        )
+        print("* XXX is relative compute, not dollars.")
+        return summary
+
+    def cost_summary(self, *, source: str = "live") -> dict[str, Any]:
+        summary = self.routing_summary(source=source)
+        if summary.get("status") == "no route data":
+            return {"source": source, "status": "no route data"}
+        compute = summary["relative_compute"]
         result = {
             "source": source,
-            "calls": len(rows),
-            "routed_estimated_xxx": round(routed, 8),
-            "glm_repricing_of_same_tokens_xxx": round(all_glm, 8),
-            "estimated_reduction_percent": (
-                round((1 - routed / all_glm) * 100, 2)
-                if all_glm and not missing
-                else None
-            ),
-            "incomplete_cost_calls": missing,
+            "calls": summary["total_calls"],
+            "routed_estimated_xxx": compute["vllm_sr_auto_xxx"],
+            "glm_repricing_of_same_tokens_xxx": compute[
+                "all_glm_flash_max_same_tokens_xxx"
+            ],
+            "estimated_reduction_percent": compute["reduction_percent"],
+            "incomplete_cost_calls": compute["incomplete_cost_calls"],
+            "qualification": compute["baseline"],
         }
+        return result
+
+    def policy_comparison(self) -> dict[str, Any]:
+        if not self.policy_analysis_file.is_file():
+            raise FileNotFoundError(
+                "The precomputed policy-analysis artifact is not installed."
+            )
+        body = json.loads(
+            self.policy_analysis_file.read_text(encoding="utf-8")
+        )
+        auto = body["arms"]["auto"]
+        direct = body["arms"]["direct_glm"]
+        matched = body["matched_successful_pairs"]
+        routing = body["same_auto_token_backend_mix"]
+        result = {
+            "quality_gate": body["quality_definition"],
+            "reliability": {
+                "vllm_sr_auto": (
+                    f"{auto['functional_successes']}/{auto['attempts']}"
+                ),
+                "direct_glm": (
+                    f"{direct['functional_successes']}/{direct['attempts']}"
+                ),
+            },
+            "empirical_matched_successes": {
+                "pairs": matched["count"],
+                "auto_cost_xxx": matched["auto_cost_xxx"],
+                "direct_glm_cost_xxx": matched[
+                    "direct_glm_cost_xxx"
+                ],
+                "auto_savings_percent": matched[
+                    "pooled_auto_savings_percent"
+                ],
+                "latency_reduction_percent": matched[
+                    "pooled_latency_reduction_percent"
+                ],
+            },
+            "same_auto_token_sensitivity": {
+                "auto_actual_cost_xxx": routing[
+                    "auto_actual_cost_xxx"
+                ],
+                "same_tokens_at_glm_rates_xxx": routing[
+                    "same_tokens_at_glm_rates_xxx"
+                ],
+                "gross_backend_model_mix_savings_percent": routing[
+                    "gross_backend_model_mix_savings_percent"
+                ],
+            },
+            "auto_route_counts": {
+                "models": body["auto_routes"]["models"],
+                "decisions": body["auto_routes"]["decisions"],
+                "phase_routes": body["auto_routes"]["phase_routes"],
+            },
+            "qualification": {
+                "unit": "XXX is relative compute, not money.",
+                "same_token": routing["qualification"],
+            },
+        }
+        print(json.dumps(result, indent=2))
         return result
 
 

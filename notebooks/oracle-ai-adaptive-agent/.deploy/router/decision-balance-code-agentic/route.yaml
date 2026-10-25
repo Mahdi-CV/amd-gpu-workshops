@@ -1,0 +1,24 @@
+name: code_agentic
+description: >-
+  Code-review and debugging requests that use tools go to Flash-Next, while
+  non-code tool work and recovery still use GLM.
+priority: 750
+rules:
+  operator: AND
+  on_unknown: no_match
+  conditions:
+    - type: decision
+      name: task
+      label: code
+    - operator: OR
+      conditions:
+        - type: conversation
+          name: has_tools
+        - type: conversation
+          name: tool_loop
+modelRefs:
+  - model: qwen/qwen3.8-flash-next
+    use_reasoning: true
+    reasoning_effort: medium
+algorithm:
+  type: static

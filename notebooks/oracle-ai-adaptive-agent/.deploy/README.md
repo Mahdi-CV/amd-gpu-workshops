@@ -97,6 +97,13 @@ ssh -L 8890:127.0.0.1:8890 root@165.245.141.106
 Open `http://127.0.0.1:8890/lab` and enter the token stored in
 `/etc/openclaw-vsr-workshop/jupyter_token`.
 
+Participant notebooks:
+
+```text
+openclaw-multi-agent-workshop.ipynb   original panel/Fixer workshop
+workshop.ipynb                        controlled routing evaluation
+```
+
 ## Operations
 
 Run packaged commands through Compose:
@@ -131,6 +138,25 @@ The persistent bind is `/srv/openclaw-vsr-workshop/workspace:/workspace`.
 Results belong under `/workspace/results`. Gateway logs can contain model
 output; treat them as sensitive and do not include them in a handoff without
 review. Container logs rotate at 10 MiB with three files retained.
+
+## Deploy the code-agentic Decision Balance overlay
+
+The portable overlay under
+[`router/decision-balance-code-agentic/`](router/decision-balance-code-agentic/)
+adds a priority-750 route for code-oriented tool use:
+
+```text
+recovery       -> GLM
+code_agentic   -> Flash-Next
+agentic        -> GLM
+code           -> Flash-Next
+fast           -> Qwen3.8-27B
+```
+
+It patches an existing Decision Balance config instead of replacing deployment
+specific endpoints, guards, observability, credentials, or storage settings.
+Its README covers idempotent patching, validation, management-API planning,
+hot apply, route probes, and rollback.
 
 ## Verify the CPU-only boundary
 

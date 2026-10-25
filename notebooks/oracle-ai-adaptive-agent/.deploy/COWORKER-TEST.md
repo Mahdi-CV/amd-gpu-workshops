@@ -66,7 +66,7 @@ Hard gates:
 Baseline: 5 failed, 102 passed
 Final:    107 passed
 Tests unchanged: true
-Exact source-only patch: true
+Minimal source-only fix: true
 ```
 
 Before every TUI prompt, run its `lab.mark_phase(...)` cell.
@@ -75,13 +75,19 @@ Expected live routes:
 
 | Phase | Decision | Model |
 | --- | --- | --- |
-| `bug_reviewer` | `code` | `qwen/qwen3.8-flash-next` |
-| `test_reviewer` | `code` | `qwen/qwen3.8-flash-next` |
-| `fixer` | `agentic` or `recovery` | `zai/glm-5.3-flash` |
+| `bug_reviewer` | `code_agentic` or `code` | `qwen/qwen3.8-flash-next` |
+| `test_reviewer` | `code_agentic` or `code` | `qwen/qwen3.8-flash-next` |
+| `fixer` | `code_agentic` | `qwen/qwen3.8-flash-next` |
+| `fixer` continuation | `recovery` | `zai/glm-5.3-flash` |
 | `main` | `fast` | `qwen/qwen3.8-27b` |
 
 The reviewers and `main` may declare three minimal-profile tools. That is
 normal. They should not actually invoke filesystem or execution tools.
+
+Before testing another deployment, follow
+`.deploy/router/decision-balance-code-agentic/README.md` and run all four route
+probes. Do not assume the overlay is active merely because `vllm-sr/auto`
+exists.
 
 ## 4. Run the policy comparison
 
@@ -109,7 +115,21 @@ docker compose \
     /workspace/results/coworker-comparison/summary.json
 ```
 
-Both policies must complete all three runs with `107 passed`.
+Generate the sanitized detailed analysis:
+
+```bash
+docker compose \
+  --env-file /etc/openclaw-vsr-workshop/workshop.env \
+  exec workshop \
+  workshop-analyze-results \
+    /workspace/results/coworker-comparison/summary.json \
+    --json-output /workspace/results/coworker-comparison/analysis.json \
+    --markdown-output /workspace/results/coworker-comparison/analysis.md
+```
+
+Treat a run as functionally successful when it reaches `107 passed`, leaves
+tests unchanged, and makes only the accepted one-line source fix. Do not reject
+the equivalent unparenthesized form of the same expression.
 
 ## 5. Return these artifacts
 
@@ -124,6 +144,8 @@ Return:
 - `summary.json`
 - `comparison.csv`
 - `report.md`
+- `analysis.json`
+- `analysis.md`
 - each arm's `routes.jsonl`
 - pytest before/after outputs
 - patch diffs

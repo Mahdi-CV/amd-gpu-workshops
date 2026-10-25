@@ -1,0 +1,88 @@
+{
+  "schema_version": "openclaw-code-agentic-validation/v1",
+  "generated_at": "2026-10-25T04:58:00Z",
+  "hardware": "8 x AMD Instinct MI300X",
+  "recipe_change": {
+    "name": "code_agentic",
+    "priority": 750,
+    "condition": "task:code AND (has_tools OR tool_loop)",
+    "model": "qwen/qwen3.8-flash-next",
+    "reasoning": "medium",
+    "retained_glm_routes": [
+      "recovery",
+      "agentic"
+    ]
+  },
+  "route_probes": [
+    {
+      "case": "code_with_tools",
+      "decision": "code_agentic",
+      "model": "qwen/qwen3.8-flash-next",
+      "passed": true
+    },
+    {
+      "case": "generic_agentic",
+      "decision": "agentic",
+      "model": "zai/glm-5.3-flash",
+      "passed": true
+    },
+    {
+      "case": "code_without_tools",
+      "decision": "code",
+      "model": "qwen/qwen3.8-flash-next",
+      "passed": true
+    },
+    {
+      "case": "recovery",
+      "decision": "recovery",
+      "model": "zai/glm-5.3-flash",
+      "passed": true
+    }
+  ],
+  "review_panel": {
+    "baseline": {
+      "calls": 21,
+      "flash_next_calls": 2,
+      "glm_calls": 19,
+      "relative_compute_xxx": 0.11377763
+    },
+    "code_agentic": {
+      "calls": 23,
+      "flash_next_calls": 18,
+      "glm_calls": 5,
+      "relative_compute_xxx": 0.06615557
+    },
+    "relative_compute_reduction_percent": 41.86,
+    "quality": {
+      "performance_review_complete": true,
+      "readability_review_complete": true,
+      "merged_report_complete": true
+    }
+  },
+  "fixer_smoke": {
+    "auto": {
+      "passed": true,
+      "tests": "107 passed",
+      "relative_compute_xxx": 0.04775879,
+      "workflow_seconds": 113.268,
+      "routes": {
+        "code_agentic_flash_next": 5,
+        "recovery_glm": 5,
+        "fast_qwen_27b": 1
+      }
+    },
+    "direct_glm": {
+      "passed": true,
+      "tests": "107 passed",
+      "relative_compute_xxx": 0.06613529,
+      "workflow_seconds": 122.976
+    },
+    "relative_compute_reduction_percent": 27.79
+  },
+  "qualification": [
+    "XXX is relative compute, not money.",
+    "The panel comparison is an observed run, not a statistical benchmark.",
+    "The panel reduced relative compute but did not reduce summed per-request latency.",
+    "The Fixer smoke is one matched deterministic pair."
+  ]
+}

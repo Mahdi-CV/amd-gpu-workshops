@@ -68,10 +68,11 @@ RUN groupadd --gid "${WORKSHOP_GID}" workshop \
       workshop
 
 WORKDIR /opt/workshop
-COPY workshop.ipynb README.md /opt/workshop/
+COPY workshop.ipynb openclaw-multi-agent-workshop.ipynb README.md /opt/workshop/
 COPY .deploy/bin/ /opt/workshop/.deploy/bin/
 COPY .deploy/lib/ /opt/workshop/.deploy/lib/
 COPY .deploy/tests/ /opt/workshop/.deploy/tests/
+COPY .deploy/router/ /opt/workshop/.deploy/router/
 COPY .deploy/fixture/ /opt/workshop/.deploy/fixture/
 COPY .deploy/artifacts/ /opt/workshop/.deploy/artifacts/
 COPY .deploy/config/ /opt/workshop/.deploy/config/
@@ -104,6 +105,10 @@ RUN find /opt/workshop -type d -name __pycache__ -prune -exec rm -rf {} + \
     && if [[ -f /opt/workshop/.deploy/bin/compare-policies.py ]]; then \
          ln -s /opt/workshop/.deploy/bin/compare-policies.py \
            /usr/local/bin/workshop-compare; \
+       fi \
+    && if [[ -f /opt/workshop/.deploy/bin/analyze-policy-results.py ]]; then \
+         ln -s /opt/workshop/.deploy/bin/analyze-policy-results.py \
+           /usr/local/bin/workshop-analyze-results; \
        fi
 
 ENV PATH="/opt/workshop-venv/bin:/usr/local/bin:${PATH}" \

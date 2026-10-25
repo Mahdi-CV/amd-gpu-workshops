@@ -11,6 +11,7 @@ jupyter --version
 test ! -e /dev/kfd
 test ! -e /dev/dri/renderD128
 test -f "$WORKSHOP_ROOT/workshop.ipynb"
+test -f "$WORKSHOP_ROOT/openclaw-multi-agent-workshop.ipynb"
 test -f "$WORKSHOP_ROOT/.deploy/fixture/MANIFEST.sha256"
 
 (
@@ -19,8 +20,13 @@ test -f "$WORKSHOP_ROOT/.deploy/fixture/MANIFEST.sha256"
 )
 
 python3 -m py_compile \
+  "$WORKSHOP_ROOT/.deploy/bin/analyze-policy-results.py" \
+  "$WORKSHOP_ROOT/.deploy/bin/compare-policies.py" \
   "$WORKSHOP_ROOT/.deploy/bin/logging_proxy.py" \
   "$WORKSHOP_ROOT/.deploy/bin/endpoint_access.py" \
+  "$WORKSHOP_ROOT/.deploy/router/decision-balance-code-agentic/deploy.py" \
+  "$WORKSHOP_ROOT/.deploy/router/decision-balance-code-agentic/patch_config.py" \
+  "$WORKSHOP_ROOT/.deploy/router/decision-balance-code-agentic/probe.py" \
   "$WORKSHOP_ROOT/.deploy/lib/workshop_lab.py"
 
 if rg -n \
