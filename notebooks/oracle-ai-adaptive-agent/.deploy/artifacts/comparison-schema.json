@@ -1,0 +1,304 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "openclaw-policy-comparison/v1",
+  "title": "OpenClaw matched auto vs direct GLM comparison",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "generated_at",
+    "recipe",
+    "seed",
+    "design",
+    "endpoints",
+    "execution_plan",
+    "pairs",
+    "aggregate",
+    "artifact_contract",
+    "passed"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": "openclaw-policy-comparison/v1"
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "recipe": {
+      "type": "object",
+      "required": [
+        "id",
+        "version",
+        "currency",
+        "cost_factors_sha256"
+      ],
+      "properties": {
+        "id": {
+          "const": "decision-balance"
+        },
+        "version": {
+          "const": "0.3.2"
+        },
+        "currency": {
+          "const": "XXX"
+        },
+        "cost_factors_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "seed": {
+      "type": "integer"
+    },
+    "design": {
+      "type": "object",
+      "required": [
+        "matched_pairs",
+        "sequential",
+        "pair_order_randomized",
+        "within_pair_arm_order_randomized"
+      ],
+      "properties": {
+        "matched_pairs": {
+          "const": 3
+        },
+        "sequential": {
+          "const": true
+        },
+        "pair_order_randomized": {
+          "const": true
+        },
+        "within_pair_arm_order_randomized": {
+          "const": true
+        }
+      }
+    },
+    "endpoints": {
+      "type": "object",
+      "required": [
+        "auto",
+        "direct_glm"
+      ],
+      "properties": {
+        "auto": {
+          "$ref": "#/$defs/endpoint"
+        },
+        "direct_glm": {
+          "$ref": "#/$defs/endpoint"
+        }
+      }
+    },
+    "execution_plan": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "$ref": "#/$defs/execution"
+      }
+    },
+    "pairs": {
+      "type": "array",
+      "minItems": 3,
+      "maxItems": 3,
+      "items": {
+        "$ref": "#/$defs/pair"
+      }
+    },
+    "aggregate": {
+      "type": "object"
+    },
+    "artifact_contract": {
+      "type": "object",
+      "required": [
+        "authoritative",
+        "derived",
+        "schema"
+      ],
+      "properties": {
+        "authoritative": {
+          "const": "summary.json"
+        },
+        "derived": {
+          "const": [
+            "comparison.csv",
+            "report.md"
+          ]
+        }
+      }
+    },
+    "passed": {
+      "type": "boolean"
+    }
+  },
+  "$defs": {
+    "endpoint": {
+      "type": "object",
+      "required": [
+        "base_url",
+        "credential_file",
+        "credential_env",
+        "model",
+        "preflight"
+      ],
+      "properties": {
+        "base_url": {
+          "type": "string",
+          "pattern": "^https?://"
+        },
+        "credential_file": {
+          "type": "string"
+        },
+        "credential_env": {
+          "type": "string",
+          "pattern": "_FILE$"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1
+        },
+        "preflight": {
+          "type": "object",
+          "required": [
+            "status",
+            "latency_seconds",
+            "models"
+          ],
+          "properties": {
+            "status": {
+              "const": 200
+            },
+            "latency_seconds": {
+              "type": "number",
+              "minimum": 0
+            },
+            "models": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "execution": {
+      "type": "object",
+      "required": [
+        "position",
+        "pair_id",
+        "pair_execution_index",
+        "arm_position",
+        "arm"
+      ],
+      "properties": {
+        "position": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 6
+        },
+        "pair_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "arm": {
+          "enum": [
+            "auto",
+            "direct_glm"
+          ]
+        }
+      }
+    },
+    "pair": {
+      "type": "object",
+      "required": [
+        "pair_id",
+        "execution_index",
+        "arm_order",
+        "arms"
+      ],
+      "properties": {
+        "pair_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 3
+        },
+        "arm_order": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "items": {
+            "enum": [
+              "auto",
+              "direct_glm"
+            ]
+          },
+          "uniqueItems": true
+        },
+        "arms": {
+          "type": "object",
+          "required": [
+            "auto",
+            "direct_glm"
+          ],
+          "properties": {
+            "auto": {
+              "$ref": "#/$defs/arm"
+            },
+            "direct_glm": {
+              "$ref": "#/$defs/arm"
+            }
+          }
+        }
+      }
+    },
+    "arm": {
+      "type": "object",
+      "required": [
+        "status",
+        "execution_position",
+        "passed"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "completed",
+            "error"
+          ]
+        },
+        "execution_position": {
+          "type": "integer"
+        },
+        "requested_model": {
+          "type": "string"
+        },
+        "paths": {
+          "type": "object"
+        },
+        "phases": {
+          "type": "object"
+        },
+        "handoffs": {
+          "type": "object"
+        },
+        "quality": {
+          "type": "object"
+        },
+        "calls": {
+          "type": "array"
+        },
+        "metrics": {
+          "type": "object"
+        },
+        "error": {
+          "type": "object"
+        },
+        "passed": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}

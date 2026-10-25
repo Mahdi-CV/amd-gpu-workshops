@@ -1,11 +1,12 @@
 # Build an OpenClaw Debugging Team
 
-This is a simple, TUI-first workshop with two goals:
+This participant workshop teaches:
 
-1. teach how OpenClaw agents, workspaces, roles, and tools work; and
-2. show how `vllm-sr/auto` selects different models for different agent roles.
+1. how to build and switch between OpenClaw agents; and
+2. how `vllm-sr/auto` selects model capability per role.
 
-Open:
+The Docker runtime already contains OpenClaw, the fixture, endpoint proxy,
+state paths, and lifecycle commands. Open:
 
 ```text
 workshop.ipynb
@@ -14,65 +15,45 @@ workshop.ipynb
 ## Team
 
 ```text
-main             short final reporter
-bug_reviewer     tool-free code diagnosis
-test_reviewer    tool-free regression-test reasoning
-fixer            tool-capable source edit and pytest verification
+bug_reviewer     focused code diagnosis
+test_reviewer    focused regression reasoning
+fixer            source editing and pytest
+main             one-sentence verified report
 ```
 
-Participants switch agents interactively in one OpenClaw TUI.
+All agents use the normal `vllm-sr/auto` provider:
 
-## Expected route split
+- reviewers and `main` use OpenClaw's `minimal` profile;
+- the Fixer uses the `coding` profile.
 
-The workshop targets Decision Balance recipe `0.3.2`:
-
-| Agent work | Decision | Expected model |
-| --- | --- | --- |
-| Bug review | `code` | Qwen3.8-Flash-Next |
-| Test review | `code` | Qwen3.8-Flash-Next |
-| File editing and pytest | `agentic` or `recovery` | GLM-5.3-Flash |
-| One-sentence verified summary | `fast` | Qwen3.8-27B |
-
-Every agent requests only:
+Expected Decision Balance `0.3.2` routes:
 
 ```text
-vllm-sr/auto
+reviewers → code    → Qwen3.8-Flash-Next
+fixer     → agentic → GLM-5.3-Flash
+main      → fast    → Qwen3.8-27B
 ```
 
 ## Quality gate
 
-The frozen `open_type_faster` fixture begins with:
-
 ```text
-5 failed, 102 passed
+Before: 5 failed, 102 passed
+After:  107 passed
 ```
 
-The Fixer succeeds only when:
+The notebook also verifies that tests are unchanged and only the intended
+source line changed.
 
-```text
-107 passed
-```
+## Runtime commands
 
-No LLM judge is used.
-
-## Endpoint configuration
+Inside the container:
 
 ```bash
-export OPENAI_BASE_URL="https://your-openai-compatible-endpoint.example/v1"
-export OPENAI_API_KEY="..."
-export OPENAI_MODEL="vllm-sr/auto"
-export VLLM_SR_DASHBOARD_URL="https://your-dashboard.example"
+workshop-status
+workshop-reset
+workshop-verify-image
+workshop-verify-e2e
+workshop-compare --repetitions 3
 ```
 
-The key is not printed or stored in the notebook.
-
-## Included files
-
-```text
-.deploy/fixture/open_type_faster/   frozen debugging project
-.deploy/bin/logging_proxy.py        sanitized route logger
-.deploy/artifacts/simple-route-results.md
-.deploy/PRESENTER-GUIDE.md          presenter-only notes
-```
-
-The participant flow does not use a hidden orchestration or scoring harness.
+Deployment and coworker instructions are under `.deploy/`.

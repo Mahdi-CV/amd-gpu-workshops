@@ -1,0 +1,41 @@
+{
+  "schema_version": "decision-balance-cost-factors/v1",
+  "recipe": {
+    "id": "decision-balance",
+    "version": "0.3.2",
+    "currency": "XXX",
+    "unit": "relative GPU-seconds",
+    "qualification": "XXX is a relative compute unit, not money. Rates are per 1,000,000 tokens."
+  },
+  "models": {
+    "zai/glm-5.3-flash": {
+      "aliases": [
+        "glm-5.3-flash",
+        "glm-5-3-flash"
+      ],
+      "prompt_per_1m": 0.44,
+      "completion_per_1m": 4.35
+    },
+    "qwen/qwen3.8-flash-next": {
+      "aliases": [
+        "qwen3.8-flash-next",
+        "qwen3-8-flash-next"
+      ],
+      "prompt_per_1m": 0.2,
+      "completion_per_1m": 1.99
+    },
+    "qwen/qwen3.8-27b": {
+      "aliases": [
+        "qwen3.8-27b",
+        "qwen3-8-27b"
+      ],
+      "prompt_per_1m": 0.1,
+      "completion_per_1m": 1.0
+    }
+  },
+  "source": {
+    "recipe_path": "config/recipes/decision-balance/config.yaml",
+    "recipe_config_sha256": "3d6e53bb10b524dd0d856b4b5c2ea114e0fbe7a22f9cc7f08f2a128ca28e4176",
+    "recipe_metadata_sha256": "c91a98af0b391b23a77bae4d4e56dc979fc4250e6b84b74f9b4526e17f8ca75e"
+  }
+}

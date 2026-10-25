@@ -1,0 +1,100 @@
+name: openclaw-vsr-workshop
+
+services:
+  workshop:
+    image: "${WORKSHOP_IMAGE:-openclaw-vsr-workshop:local}"
+    build:
+      context: ..
+      dockerfile: .deploy/Dockerfile
+      args:
+        BASE_IMAGE: "${BASE_IMAGE:-rocm@sha256:81cb82398fd6f1c0d2fff67fd7629867814fdeca5f192119e41024a15eb5bd9d}"
+        NODE_IMAGE: "${NODE_IMAGE:-node:24.16.0-bookworm-slim}"
+        OPENCLAW_VERSION: "${OPENCLAW_VERSION:-2026.10.4}"
+        SOURCE_REVISION: "${SOURCE_REVISION:-unavailable}"
+        WORKSHOP_UID: "${WORKSHOP_UID:-1000}"
+        WORKSHOP_GID: "${WORKSHOP_GID:-1000}"
+    restart: unless-stopped
+    user: "0:0"
+    ports:
+      - "127.0.0.1:${JUPYTER_HOST_PORT:-8890}:8888"
+    environment:
+      WORKSHOP_UID: "${WORKSHOP_UID:-1000}"
+      WORKSHOP_GID: "${WORKSHOP_GID:-1000}"
+      WORKSHOP_ROOT: /opt/workshop
+      WORKSHOP_WORKSPACE: /workspace
+      WORKSHOP_RUNTIME_DIR: /workspace/runtime
+      OPENCLAW_STATE_DIR: /workspace/state/openclaw
+      OPENCLAW_WORKSHOP_STATE_DIR: /workspace/state/openclaw
+      OPENCLAW_WORKSHOP_WORKSPACES: /workspace/agents
+      OPENCLAW_WORKSHOP_DEMO_ROOT: /workspace/demo
+      AUTO_BASE_URL: "${AUTO_BASE_URL:-https://api.134.199.192.106.sslip.io/v1}"
+      AUTO_MODEL: "${AUTO_MODEL:-vllm-sr/auto}"
+      GLM_BASE_URL: "${GLM_BASE_URL:-https://api.134.199.192.106.sslip.io/glm/v1}"
+      GLM_MODEL: "${GLM_MODEL:-}"
+      OPENAI_BASE_URL: "${AUTO_BASE_URL:-https://api.134.199.192.106.sslip.io/v1}"
+      OPENAI_MODEL: "${AUTO_MODEL:-vllm-sr/auto}"
+      VLLM_SR_DASHBOARD_URL: "${VLLM_SR_DASHBOARD_URL:-}"
+      AUTO_API_KEY_FILE: /run/secrets/auto_api_key
+      OPENAI_API_KEY_FILE: /run/secrets/auto_api_key
+      GLM_API_KEY_FILE: /run/secrets/glm_api_key
+      JUPYTER_TOKEN_FILE: /run/secrets/jupyter_token
+      PROXY_LISTEN_HOST: 127.0.0.1
+      PROXY_LISTEN_PORT: "19090"
+      JUPYTER_LISTEN_HOST: 0.0.0.0
+      JUPYTER_LISTEN_PORT: "8888"
+      CUDA_VISIBLE_DEVICES: "-1"
+      HIP_VISIBLE_DEVICES: "-1"
+      HSA_VISIBLE_DEVICES: "-1"
+      NVIDIA_VISIBLE_DEVICES: "-1"
+      ROCR_VISIBLE_DEVICES: "-1"
+      GPU_DEVICE_ORDINAL: "-1"
+    volumes:
+      - type: bind
+        source: "${WORKSPACE_HOST_PATH:-/srv/openclaw-vsr-workshop/workspace}"
+        target: /workspace
+    secrets:
+      - source: auto_api_key
+        target: auto_api_key
+      - source: glm_api_key
+        target: glm_api_key
+      - source: jupyter_token
+        target: jupyter_token
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - FOWNER
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    shm_size: 256m
+    stop_grace_period: 30s
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          curl --fail --silent --show-error --max-time 2
+          http://127.0.0.1:19090/readyz >/dev/null &&
+          python -c 'import socket;
+          s=socket.create_connection(("127.0.0.1", 8888), 2);
+          s.close()'
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 8
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+secrets:
+  auto_api_key:
+    file: "${AUTO_API_KEY_SECRET_FILE:-/etc/openclaw-vsr-workshop/auto_api_key}"
+  glm_api_key:
+    file: "${GLM_API_KEY_SECRET_FILE:-/etc/openclaw-vsr-workshop/glm_api_key}"
+  jupyter_token:
+    file: "${JUPYTER_TOKEN_SECRET_FILE:-/etc/openclaw-vsr-workshop/jupyter_token}"

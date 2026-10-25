@@ -10,6 +10,9 @@ __pycache__/
 
 # Workshop runtime artifacts
 notebooks/oracle-ai-adaptive-agent/.deploy/live/
+notebooks/oracle-ai-adaptive-agent/.deploy/secrets/*.txt
+notebooks/oracle-ai-adaptive-agent/.deploy/runtime/
+notebooks/oracle-ai-adaptive-agent/.deploy/results/
 
 # Archives
 *.zip

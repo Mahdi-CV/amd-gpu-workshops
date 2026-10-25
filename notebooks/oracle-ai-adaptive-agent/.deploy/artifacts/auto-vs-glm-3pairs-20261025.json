@@ -1,0 +1,271 @@
+{
+  "schema_version": "openclaw-policy-comparison-compact/v1",
+  "generated_at": "2026-10-25T01:54:56.232821+00:00",
+  "seed": 20261025,
+  "recipe": {
+    "id": "decision-balance",
+    "version": "0.3.2",
+    "currency": "XXX",
+    "unit": "relative GPU-seconds",
+    "qualification": "XXX is a relative compute unit, not money. Rates are per 1,000,000 tokens.",
+    "cost_factors_sha256": "fa34a88dbc7cefd09b37b67b11fa8fa0eab5041558bf2fdecd345df4cf5f6409"
+  },
+  "design": {
+    "matched_pairs": 3,
+    "sequential": true,
+    "pair_order_randomized": true,
+    "within_pair_arm_order_randomized": true
+  },
+  "endpoints": {
+    "auto": {
+      "base_url": "https://api.134.199.192.106.sslip.io/v1",
+      "model": "vllm-sr/auto",
+      "preflight": {
+        "status": 200,
+        "latency_seconds": 0.0112,
+        "models": [
+          "vllm-sr/auto"
+        ]
+      }
+    },
+    "direct_glm": {
+      "base_url": "https://api.134.199.192.106.sslip.io/glm/v1",
+      "model": "zai/glm-5.3-flash",
+      "preflight": {
+        "status": 200,
+        "latency_seconds": 0.0074,
+        "models": [
+          "zai/glm-5.3-flash"
+        ]
+      }
+    }
+  },
+  "pairs": [
+    {
+      "pair_id": 1,
+      "execution_index": 1,
+      "arm_order": [
+        "direct_glm",
+        "auto"
+      ],
+      "arms": {
+        "auto": {
+          "status": "completed",
+          "passed": true,
+          "execution_position": 2,
+          "metrics": {
+            "actual_cost_xxx": 0.04385829,
+            "auto_tokens_glm_reprice_xxx": 0.0529917,
+            "tokens": {
+              "prompt_tokens": 72645,
+              "completion_tokens": 4834,
+              "reasoning_tokens": 2699,
+              "cached_tokens": 0
+            },
+            "requests": 10,
+            "assistant_turns": 10,
+            "agent_wall_time_seconds": 82.931,
+            "workflow_wall_time_seconds": 96.16,
+            "total_arm_wall_time_seconds": 96.634
+          },
+          "quality": {
+            "baseline_exact": true,
+            "posttest_exact": true,
+            "tests_unchanged": true,
+            "exact_source_patch": true,
+            "passed": true
+          }
+        },
+        "direct_glm": {
+          "status": "completed",
+          "passed": true,
+          "execution_position": 1,
+          "metrics": {
+            "actual_cost_xxx": 0.08711995,
+            "auto_tokens_glm_reprice_xxx": null,
+            "tokens": {
+              "prompt_tokens": 76190,
+              "completion_tokens": 12321,
+              "reasoning_tokens": 10450,
+              "cached_tokens": 0
+            },
+            "requests": 11,
+            "assistant_turns": 11,
+            "agent_wall_time_seconds": 152.326,
+            "workflow_wall_time_seconds": 165.862,
+            "total_arm_wall_time_seconds": 166.342
+          },
+          "quality": {
+            "baseline_exact": true,
+            "posttest_exact": true,
+            "tests_unchanged": true,
+            "exact_source_patch": true,
+            "passed": true
+          }
+        }
+      }
+    },
+    {
+      "pair_id": 2,
+      "execution_index": 3,
+      "arm_order": [
+        "auto",
+        "direct_glm"
+      ],
+      "arms": {
+        "auto": {
+          "status": "completed",
+          "passed": true,
+          "execution_position": 5,
+          "metrics": {
+            "actual_cost_xxx": 0.0514873,
+            "auto_tokens_glm_reprice_xxx": 0.05949486,
+            "tokens": {
+              "prompt_tokens": 91854,
+              "completion_tokens": 4386,
+              "reasoning_tokens": 2126,
+              "cached_tokens": 0
+            },
+            "requests": 11,
+            "assistant_turns": 11,
+            "agent_wall_time_seconds": 78.469,
+            "workflow_wall_time_seconds": 91.767,
+            "total_arm_wall_time_seconds": 92.247
+          },
+          "quality": {
+            "baseline_exact": true,
+            "posttest_exact": true,
+            "tests_unchanged": true,
+            "exact_source_patch": true,
+            "passed": true
+          }
+        },
+        "direct_glm": {
+          "status": "error",
+          "passed": false,
+          "execution_position": 6,
+          "error": {
+            "type": "RuntimeError",
+            "message": "fixer failed (1): : cataloged 37 tools behind compact prompt surface"
+          }
+        }
+      }
+    },
+    {
+      "pair_id": 3,
+      "execution_index": 2,
+      "arm_order": [
+        "direct_glm",
+        "auto"
+      ],
+      "arms": {
+        "auto": {
+          "status": "completed",
+          "passed": true,
+          "execution_position": 4,
+          "metrics": {
+            "actual_cost_xxx": 0.0543796,
+            "auto_tokens_glm_reprice_xxx": 0.06204091,
+            "tokens": {
+              "prompt_tokens": 96464,
+              "completion_tokens": 4505,
+              "reasoning_tokens": 2228,
+              "cached_tokens": 0
+            },
+            "requests": 12,
+            "assistant_turns": 12,
+            "agent_wall_time_seconds": 82.324,
+            "workflow_wall_time_seconds": 95.513,
+            "total_arm_wall_time_seconds": 95.998
+          },
+          "quality": {
+            "baseline_exact": true,
+            "posttest_exact": true,
+            "tests_unchanged": true,
+            "exact_source_patch": true,
+            "passed": true
+          }
+        },
+        "direct_glm": {
+          "status": "completed",
+          "passed": true,
+          "execution_position": 3,
+          "metrics": {
+            "actual_cost_xxx": 0.087837,
+            "auto_tokens_glm_reprice_xxx": null,
+            "tokens": {
+              "prompt_tokens": 93450,
+              "completion_tokens": 10740,
+              "reasoning_tokens": 8861,
+              "cached_tokens": 0
+            },
+            "requests": 15,
+            "assistant_turns": 15,
+            "agent_wall_time_seconds": 138.357,
+            "workflow_wall_time_seconds": 151.722,
+            "total_arm_wall_time_seconds": 152.197
+          },
+          "quality": {
+            "baseline_exact": true,
+            "posttest_exact": true,
+            "tests_unchanged": true,
+            "exact_source_patch": true,
+            "passed": true
+          }
+        }
+      }
+    }
+  ],
+  "aggregate": {
+    "arms": {
+      "auto": {
+        "runs": 3,
+        "passed": 3,
+        "requests": 33,
+        "assistant_turns": 33,
+        "tokens": {
+          "prompt_tokens": 260963,
+          "completion_tokens": 13725,
+          "reasoning_tokens": 7053,
+          "cached_tokens": 0
+        },
+        "workflow_wall_time_seconds": 283.44,
+        "actual_cost_xxx": 0.14972519,
+        "auto_tokens_glm_reprice_xxx": 0.17452747
+      },
+      "direct_glm": {
+        "runs": 2,
+        "passed": 2,
+        "requests": 26,
+        "assistant_turns": 26,
+        "tokens": {
+          "prompt_tokens": 169640,
+          "completion_tokens": 23061,
+          "reasoning_tokens": 19311,
+          "cached_tokens": 0
+        },
+        "workflow_wall_time_seconds": 317.584,
+        "actual_cost_xxx": 0.17495695,
+        "auto_tokens_glm_reprice_xxx": null
+      }
+    },
+    "paired_cost": {
+      "primary_actual_execution": {
+        "completed_matched_pairs": 2,
+        "auto_actual_cost_xxx": 0.09823789,
+        "direct_glm_actual_cost_xxx": 0.17495695,
+        "direct_minus_auto_xxx": 0.07671906,
+        "auto_savings_percent_vs_direct": 43.85
+      },
+      "secondary_auto_token_glm_repricing": {
+        "completed_matched_pairs": 2,
+        "auto_actual_cost_xxx": 0.09823789,
+        "auto_tokens_repriced_as_glm_xxx": 0.11503261,
+        "repriced_minus_auto_xxx": 0.01679472,
+        "routing_savings_percent": 14.6
+      }
+    }
+  },
+  "passed": false,
+  "note": "One direct-GLM Fixer run failed with an incomplete or malformed tool call; no retry was hidden."
+}
