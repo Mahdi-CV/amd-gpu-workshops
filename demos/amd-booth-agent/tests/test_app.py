@@ -37,6 +37,15 @@ def test_sse_usage_and_tool_calls_are_recovered():
     assert call["function"]["name"] == "browser_open"
 
 
+def test_reasoning_effort_reports_selected_policy_not_projection():
+    headers = {
+        "x-vsr-selected-decision": "agentic",
+        "x-vsr-matched-projections": "effort_off",
+        "x-vsr-selected-reasoning": "on",
+    }
+    assert app.parse_effort(headers) == "high"
+
+
 def test_costs_use_cached_and_uncached_rates():
     usage = {
         "prompt_tokens": 1000,
@@ -63,3 +72,45 @@ def test_run_metrics_report_both_counterfactuals(tmp_path):
     metrics = run.metrics()
     assert metrics["savings_vs_kimi_percent"] == 90.0
     assert metrics["savings_vs_glm_percent"] == 50.0
+
+
+def test_final_text_from_history_uses_response_after_latest_yield():
+    history = {
+        "messages": [
+            {
+                "role": "assistant",
+                "api": "openai-completions",
+                "provider": "booth-main",
+                "stopReason": "stop",
+                "timestamp": 10,
+                "content": [{"type": "text", "text": "Early result"}],
+            },
+            {
+                "role": "toolResult",
+                "toolName": "sessions_yield",
+                "timestamp": 20,
+            },
+            {
+                "role": "assistant",
+                "timestamp": 21,
+                "content": [{"type": "text", "text": "Still waiting"}],
+            },
+            {
+                "role": "assistant",
+                "api": "openai-completions",
+                "provider": "booth-main",
+                "stopReason": "stop",
+                "timestamp": 30,
+                "content": [{"type": "text", "text": "Verified final result"}],
+            },
+            {
+                "role": "assistant",
+                "api": "openclaw-transcript",
+                "provider": "openclaw",
+                "stopReason": "stop",
+                "timestamp": 40,
+                "content": [{"type": "text", "text": "Learned a skill"}],
+            },
+        ]
+    }
+    assert app.final_text_from_history(history) == "Verified final result"

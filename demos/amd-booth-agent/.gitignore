@@ -1,5 +1,6 @@
 .env
 data/
+soak-results/
 secrets/*
 !secrets/README.md
 __pycache__/

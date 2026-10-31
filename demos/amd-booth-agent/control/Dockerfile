@@ -1,10 +1,12 @@
 # syntax=docker/dockerfile:1.7
 
-FROM node:24.16.0-bookworm-slim
+FROM node:24.22.1-bookworm-slim
 
-ARG OPENCLAW_VERSION=2026.10.4
-ARG BOOTH_UID=1000
-ARG BOOTH_GID=1000
+ARG OPENCLAW_VERSION=2026.10.9
+# The upstream Node image already reserves UID/GID 1000 for its `node` user.
+# Keep the booth account distinct so the image builds reliably.
+ARG BOOTH_UID=10001
+ARG BOOTH_GID=10001
 
 USER root
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -45,7 +47,7 @@ RUN groupadd --gid "${BOOTH_GID}" booth \
       booth
 
 WORKDIR /opt/booth
-COPY app.py bootstrap_openclaw.py entrypoint.sh /opt/booth/
+COPY app.py bootstrap_openclaw.py fireworks_shim.py entrypoint.sh /opt/booth/
 COPY templates/ /opt/booth/templates/
 COPY static/ /opt/booth/static/
 COPY fixtures/ /opt/booth/fixtures/
@@ -75,4 +77,4 @@ ENV PATH="/opt/booth-venv/bin:/usr/local/bin:${PATH}" \
 EXPOSE 8088
 STOPSIGNAL SIGTERM
 
-ENTRYPOINT ["/usr/bin/tini", "--", "/opt/booth/entrypoint.sh"]
+ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/opt/booth/entrypoint.sh"]

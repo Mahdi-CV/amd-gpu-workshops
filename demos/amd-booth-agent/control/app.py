@@ -25,6 +25,12 @@ APP_ROOT = Path(os.getenv("BOOTH_APP_ROOT", "/opt/booth"))
 DATA_DIR = Path(os.getenv("BOOTH_DATA_DIR", "/data"))
 RUNS_DIR = Path(os.getenv("BOOTH_RUNS_DIR", DATA_DIR / "runs"))
 STATE_DIR = Path(os.getenv("OPENCLAW_STATE_DIR", DATA_DIR / "openclaw"))
+WORKSPACES_DIR = Path(
+    os.getenv(
+        "OPENCLAW_WORKSPACES",
+        DATA_DIR / "agents",
+    )
+)
 ROUTER_BASE_URL = os.getenv("ROUTER_BASE_URL", "http://router:8899/v1").rstrip("/")
 ROUTER_MODEL = os.getenv("ROUTER_MODEL", "vllm-sr/auto")
 PUBLIC_ORIGIN = os.getenv("BOOTH_PUBLIC_ORIGIN", "")
@@ -59,6 +65,20 @@ MODEL_INFO = {
         "cached_rate": 0.30,
         "output_rate": 15.00,
     },
+}
+
+DECISION_EFFORT = {
+    "long_context": "high",
+    "vision": "medium",
+    "recovery": "max",
+    "code_agentic": "low",
+    "agentic": "high",
+    "facts": "low",
+    "frontier": "max",
+    "code": "low",
+    "hard": "high",
+    "standard": "medium",
+    "fast": "off",
 }
 
 SUGGESTED_TASKS = [
@@ -139,6 +159,9 @@ def latest_prompt(messages: Any) -> str:
 
 
 def parse_effort(headers: dict[str, str]) -> str:
+    decision = headers.get("x-vsr-selected-decision", "")
+    if decision in DECISION_EFFORT:
+        return DECISION_EFFORT[decision]
     projections = headers.get("x-vsr-matched-projections", "")
     for item in projections.split(","):
         item = item.strip()
@@ -373,7 +396,13 @@ async def create_run(request: RunRequest) -> dict[str, Any]:
         run_dir = RUNS_DIR / run_id
         run_dir.mkdir(parents=True, exist_ok=False)
         fixture = APP_ROOT / "fixtures" / "broken-benchmark"
-        if fixture.is_dir():
+        fixture_request = (
+            f"{request.title}\n{request.task}".lower()
+        )
+        if fixture.is_dir() and (
+            "benchmark" in fixture_request
+            or "latency_report" in fixture_request
+        ):
             shutil.copytree(fixture, run_dir / "benchmark-demo")
         run = RunRecord(
             id=run_id,
@@ -467,9 +496,18 @@ def list_artifacts(run: RunRecord) -> list[dict[str, Any]]:
     if not run.run_dir.is_dir():
         return artifacts
     for path in sorted(run.run_dir.rglob("*")):
-        if not path.is_file() or path.name.startswith("."):
+        if not path.is_file():
             continue
-        relative = path.relative_to(run.run_dir).as_posix()
+        relative_path = path.relative_to(run.run_dir)
+        if (
+            any(
+                part.startswith(".") or part == "__pycache__"
+                for part in relative_path.parts
+            )
+            or path.suffix == ".pyc"
+        ):
+            continue
+        relative = relative_path.as_posix()
         artifacts.append(
             {
                 "name": path.name,
@@ -517,8 +555,149 @@ def assistant_text(body: dict[str, Any]) -> str:
     return "\n\n".join(texts)
 
 
+def content_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content.strip()
+    if not isinstance(content, list):
+        return ""
+    texts = [
+        str(item.get("text") or "").strip()
+        for item in content
+        if isinstance(item, dict)
+        and item.get("type") == "text"
+        and str(item.get("text") or "").strip()
+    ]
+    return "\n\n".join(texts)
+
+
+def final_text_from_history(body: dict[str, Any]) -> str:
+    messages = body.get("messages") or []
+    if not isinstance(messages, list):
+        return ""
+    last_yield = 0
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        if (
+            message.get("role") == "toolResult"
+            and message.get("toolName") == "sessions_yield"
+        ):
+            last_yield = max(last_yield, int(message.get("timestamp") or 0))
+
+    candidates: list[tuple[int, str]] = []
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        timestamp = int(message.get("timestamp") or 0)
+        if timestamp < last_yield:
+            continue
+        if (
+            message.get("role") != "assistant"
+            or message.get("stopReason") != "stop"
+            or message.get("api") != "openai-completions"
+            or message.get("provider") != "booth-main"
+        ):
+            continue
+        text = content_text(message.get("content"))
+        if text:
+            candidates.append((timestamp, text))
+    return max(candidates, default=(0, ""))[1]
+
+
+async def openclaw_json(
+    *args: str,
+    timeout: float = 45,
+) -> dict[str, Any]:
+    env = {
+        **os.environ,
+        "OPENCLAW_STATE_DIR": str(STATE_DIR),
+        "HOME": os.getenv("HOME", "/home/booth"),
+    }
+    process = await asyncio.create_subprocess_exec(
+        "openclaw",
+        *args,
+        env=env,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(
+            process.communicate(),
+            timeout=timeout,
+        )
+    except TimeoutError:
+        process.kill()
+        await process.communicate()
+        raise
+    if process.returncode:
+        raise RuntimeError(
+            compact_text(stderr.decode(errors="replace"), 1200)
+            or f"openclaw {' '.join(args)} exited {process.returncode}"
+        )
+    body = extract_json(stdout.decode(errors="replace"))
+    if not body:
+        raise RuntimeError("OpenClaw returned no JSON payload.")
+    return body
+
+
+async def wait_for_final_response(
+    session_key: str,
+    *,
+    deadline: float,
+    run: RunRecord,
+) -> str:
+    last_error = ""
+    while time.monotonic() < deadline:
+        if run.status == "cancelled":
+            return ""
+        try:
+            history = await openclaw_json(
+                "gateway",
+                "call",
+                "chat.history",
+                "--json",
+                "--timeout",
+                "30000",
+                "--params",
+                json.dumps(
+                    {
+                        "sessionKey": session_key,
+                        "limit": 200,
+                    }
+                ),
+            )
+            text = final_text_from_history(history)
+            if text:
+                return text
+        except Exception as exc:  # pragma: no cover - runtime retry path
+            last_error = compact_text(str(exc), 500)
+        await asyncio.sleep(1)
+    detail = f" Last history error: {last_error}" if last_error else ""
+    raise TimeoutError(
+        "OpenClaw did not publish a final visible response before timeout."
+        + detail
+    )
+
+
+def prepare_run_context(run: RunRecord) -> None:
+    user_file = WORKSPACES_DIR / "main" / "USER.md"
+    user_file.parent.mkdir(parents=True, exist_ok=True)
+    user_file.write_text(
+        (
+            "# User\n\n"
+            f"Current AMD booth run: `{run.id}`.\n"
+            f"Shared run directory: `{run.run_dir}`.\n"
+            "Use that directory only when the visitor's task needs files or "
+            "artifacts. Tell every subagent the exact absolute path. Keep the "
+            "final response concise and report concrete verification.\n"
+        ),
+        encoding="utf-8",
+    )
+
+
 async def execute_run(run: RunRecord) -> None:
     run.status = "running"
+    run_deadline = time.monotonic() + MAX_RUN_SECONDS
     await run.emit(
         "run.started",
         run_id=run.id,
@@ -526,12 +705,10 @@ async def execute_run(run: RunRecord) -> None:
         task=run.task,
         run_dir=str(run.run_dir),
     )
+    prepare_run_context(run)
     prompt = (
-        f"This is AMD booth run {run.id}. The shared run directory is "
-        f"{run.run_dir}. Use it for every artifact and tell subagents the "
-        f"same absolute path.\n\nVisitor task:\n{run.task}\n\n"
-        "Use the researcher, builder, and reviewer agents when helpful. "
-        "Return a concise verified result suitable for a live booth demo."
+        f"AMD booth task:\n{run.task}\n\n"
+        "Complete the task and return a concise final result."
     )
     env = {
         **os.environ,
@@ -569,10 +746,19 @@ async def execute_run(run: RunRecord) -> None:
                 or f"OpenClaw exited {run.process.returncode}"
             )
         body = extract_json(stdout.decode(errors="replace"))
-        run.result = assistant_text(body) or compact_text(
-            stdout.decode(errors="replace"),
-            4000,
-        )
+        run.result = assistant_text(body)
+        if not run.result:
+            await run.emit(
+                "run.waiting",
+                message="Waiting for OpenClaw subagents and verification.",
+            )
+            run.result = await wait_for_final_response(
+                f"agent:main:booth-{run.id}",
+                deadline=run_deadline,
+                run=run,
+            )
+        if run.status == "cancelled":
+            return
         run.status = "completed"
         await run.emit(
             "run.completed",
@@ -585,6 +771,8 @@ async def execute_run(run: RunRecord) -> None:
         await run.emit("run.cancelled", message="Task cancelled.")
         raise
     except Exception as exc:
+        if run.status == "cancelled":
+            return
         run.status = "failed"
         run.error = compact_text(str(exc), 2000)
         await run.emit("run.failed", error=run.error, metrics=run.metrics())
@@ -667,14 +855,17 @@ async def proxy(agent: str, path: str, request: Request) -> Response:
             if key.lower().startswith("x-vsr-")
         }
         usage = usage_from_payload(parsed)
-        selected_model = (
-            route_headers.get("x-vsr-selected-model")
-            or str(parsed.get("model") or "")
-        )
+        decision = route_headers.get("x-vsr-selected-decision")
+        selected_model = route_headers.get("x-vsr-selected-model") or ""
+        if not selected_model and decision != "guard":
+            selected_model = str(parsed.get("model") or "")
         elapsed = time.perf_counter() - started
 
-        if run and selected_model:
-            actual = cost_for_model(selected_model, usage)
+        if run and (selected_model or decision):
+            metered_model = (
+                selected_model if selected_model in MODEL_INFO else ""
+            )
+            actual = cost_for_model(metered_model, usage)
             kimi = counterfactual_cost("moonshot/kimi-k3", usage)
             glm = counterfactual_cost("zai/glm-5.3-flash", usage)
             run.actual_cost += actual
@@ -683,16 +874,16 @@ async def proxy(agent: str, path: str, request: Request) -> Response:
             run.prompt_tokens += usage["prompt_tokens"]
             run.completion_tokens += usage["completion_tokens"]
             run.reasoning_tokens += usage["reasoning_tokens"]
-            run.model_counts[selected_model] = (
-                run.model_counts.get(selected_model, 0) + 1
-            )
-            decision = route_headers.get("x-vsr-selected-decision")
+            if metered_model:
+                run.model_counts[metered_model] = (
+                    run.model_counts.get(metered_model, 0) + 1
+                )
             event = {
                 "call_id": call_id,
                 "agent": agent,
                 "decision": decision,
-                "model": selected_model,
-                "model_info": MODEL_INFO.get(selected_model, {}),
+                "model": selected_model or "vLLM-SR safety guard",
+                "model_info": MODEL_INFO.get(metered_model, {}),
                 "reasoning": route_headers.get("x-vsr-selected-reasoning"),
                 "effort": parse_effort(route_headers),
                 "confidence": route_headers.get("x-vsr-selected-confidence"),

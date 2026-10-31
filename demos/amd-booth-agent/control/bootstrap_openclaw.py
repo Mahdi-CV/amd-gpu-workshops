@@ -79,9 +79,11 @@ def onboard() -> None:
 
 
 def configured_agents() -> set[str]:
-    body = json.loads(run("agents", "list", "--json").stdout)
-    rows = body.get("agents", body) if isinstance(body, dict) else body
-    return {str(row.get("id")) for row in rows}
+    body = json.loads(CONFIG.read_text(encoding="utf-8"))
+    entries = (body.get("agents") or {}).get("entries") or {}
+    if isinstance(entries, dict):
+        return {str(agent_id) for agent_id in entries}
+    return set()
 
 
 def ensure_agents() -> None:
@@ -105,7 +107,7 @@ def model_entry() -> dict[str, Any]:
     return {
         "id": ROUTER_MODEL,
         "name": "AMD Booth Semantic Router",
-        "contextWindow": 128000,
+        "contextWindow": 65536,
         "maxTokens": 8192,
         "input": ["text", "image"],
         "reasoning": False,
@@ -160,6 +162,14 @@ def patch_config() -> None:
             "web_fetch",
         ],
     }
+    for agent in ("researcher", "reviewer"):
+        entries[agent]["tools"] = {
+            "profile": "coding",
+            "alsoAllow": [
+                "browser",
+                "web_fetch",
+            ],
+        }
 
     body.setdefault("tools", {})["profile"] = "coding"
     body.setdefault("memory", {}).setdefault("search", {})["enabled"] = False

@@ -55,6 +55,46 @@ services:
       start_period: 30m
       retries: 6
 
+  fireworks-shim:
+    image: "${BOOTH_IMAGE:-amd-openclaw-booth:local}"
+    user: "0:0"
+    entrypoint:
+      - /usr/bin/tini
+      - --
+      - /opt/booth-venv/bin/uvicorn
+    command:
+      - fireworks_shim:app
+      - --app-dir
+      - /opt/booth
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8090"
+    environment:
+      FIREWORKS_BASE_URL: https://api.fireworks.ai/inference/v1
+      FIREWORKS_KEY_FILE: /run/secrets/fireworks_api_key
+      HOME: /home/booth
+    secrets:
+      - fireworks_api_key
+    restart: unless-stopped
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 256
+    healthcheck:
+      test:
+        - CMD
+        - /opt/booth-venv/bin/python
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:8090/healthz", timeout=5)
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+
   router:
     <<: *gpu
     image: "${ROUTER_IMAGE:-ghcr.io/vllm-project/semantic-router/vllm-sr-rocm@sha256:5d76c418872e8070e79e5db29d391c168d18e34664ae5c236c662b27d9eee16d}"
@@ -75,10 +115,10 @@ services:
       - ./router:/app/booth:ro
       - ./data/router-config:/app/config
       - ./data/router-models:/app/models
-    secrets:
-      - fireworks_api_key
     depends_on:
       local-model:
+        condition: service_healthy
+      fireworks-shim:
         condition: service_healthy
     ports:
       - "127.0.0.1:18899:8899"
@@ -99,9 +139,10 @@ services:
     build:
       context: ./control
       args:
-        OPENCLAW_VERSION: "${OPENCLAW_VERSION:-2026.10.4}"
+        OPENCLAW_VERSION: "${OPENCLAW_VERSION:-2026.10.9}"
     image: "${BOOTH_IMAGE:-amd-openclaw-booth:local}"
     restart: unless-stopped
+    stop_grace_period: 6m
     depends_on:
       router:
         condition: service_healthy

@@ -11,35 +11,40 @@
     <link rel="stylesheet" href="/static/app.css" />
   </head>
   <body>
-    <div class="ambient ambient-one"></div>
-    <div class="ambient ambient-two"></div>
+    <a class="skip-link" href="#task-input">Skip to task</a>
+    <div class="ambient ambient-one" aria-hidden="true"></div>
+    <div class="ambient ambient-two" aria-hidden="true"></div>
 
     <header class="topbar">
       <div class="brand">
-        <div class="amd-mark">AMD</div>
+        <div class="amd-mark" aria-label="AMD">AMD</div>
         <div>
           <div class="eyebrow">OPEN AGENT EXPERIENCE</div>
           <h1>Agent Studio</h1>
         </div>
       </div>
-      <div class="top-status">
-        <span class="status-dot" id="system-dot"></span>
+      <div class="top-status" role="status" aria-live="polite">
+        <span class="status-dot" id="system-dot" aria-hidden="true"></span>
         <span id="system-label">Connecting to model pool…</span>
-        <span class="mi300x-badge">MI300X · 192 GB HBM</span>
+        <span class="mi300x-badge">LOCAL · MI300X · 192 GB HBM</span>
       </div>
     </header>
 
     <main class="layout">
-      <aside class="panel compose-panel">
+      <aside class="panel compose-panel" aria-labelledby="compose-heading">
         <div class="panel-heading">
           <span class="step">01</span>
           <div>
-            <h2>Give OpenClaw a mission</h2>
+            <h2 id="compose-heading">Give OpenClaw a mission</h2>
             <p>Choose a booth challenge or write your own.</p>
           </div>
         </div>
 
-        <div class="suggestions" id="suggestions"></div>
+        <div
+          class="suggestions"
+          id="suggestions"
+          aria-label="Suggested booth missions"
+        ></div>
 
         <label class="prompt-label" for="task-input">
           Visitor task
@@ -49,82 +54,102 @@
           id="task-input"
           maxlength="4000"
           placeholder="Ask the agent to research, build, debug, browse, compare, or create…"
+          aria-describedby="prompt-help form-message"
         ></textarea>
-
-        <div class="actions">
-          <button class="primary" id="run-button">
-            <span>Run agent</span>
-            <span class="arrow">→</span>
-          </button>
-          <button class="secondary" id="clear-button">Clear</button>
+        <div class="prompt-meta">
+          <span id="prompt-help">Press Ctrl/⌘ + Enter to run.</span>
+          <span id="form-message" role="status" aria-live="polite"></span>
         </div>
 
-        <div class="pool">
+        <div class="actions">
+          <button class="primary" id="run-button" type="button">
+            <span id="run-button-label">Run agent</span>
+            <span class="arrow" aria-hidden="true">→</span>
+          </button>
+          <button class="secondary" id="clear-button" type="button">
+            Clear
+          </button>
+        </div>
+
+        <div class="pool" aria-labelledby="pool-heading">
           <div class="section-label">LIVE MODEL POOL</div>
-          <div id="model-pool"></div>
+          <h3 class="sr-only" id="pool-heading">Live three-model pool</h3>
+          <div id="model-pool" aria-live="polite"></div>
+          <p class="pool-note">
+            One endpoint; the router chooses a model and reasoning budget for
+            each call.
+          </p>
         </div>
       </aside>
 
-      <section class="panel timeline-panel">
+      <section class="panel timeline-panel" aria-labelledby="timeline-heading">
         <div class="panel-heading timeline-heading">
           <span class="step">02</span>
           <div>
-            <h2>Watch the agent work</h2>
+            <h2 id="timeline-heading">Watch the agent work</h2>
             <p>Every model call, tool, subagent and routing decision.</p>
           </div>
-          <div class="run-clock" id="run-clock">00:00</div>
-        </div>
-
-        <div class="agent-map" id="agent-map">
-          <div class="agent-node active" data-agent="main">
-            <span>MAIN</span>
-            <strong>Coordinator</strong>
-          </div>
-          <div class="agent-connector"></div>
-          <div class="agent-node" data-agent="researcher">
-            <span>SUBAGENT</span>
-            <strong>Researcher</strong>
-          </div>
-          <div class="agent-node" data-agent="builder">
-            <span>SUBAGENT</span>
-            <strong>Builder</strong>
-          </div>
-          <div class="agent-node" data-agent="reviewer">
-            <span>SUBAGENT</span>
-            <strong>Reviewer</strong>
+          <div class="run-meta">
+            <span class="run-state" id="run-state">Idle</span>
+            <div
+              class="run-clock"
+              id="run-clock"
+              aria-label="Elapsed run time"
+            >
+              00:00
+            </div>
           </div>
         </div>
 
-        <div class="timeline empty" id="timeline">
+        <div class="agent-visibility">
+          <div
+            class="agent-map"
+            id="agent-map"
+            aria-label="Agent participation"
+          ></div>
+          <p class="agent-summary" id="agent-summary">
+            Subagents appear when OpenClaw delegates work.
+          </p>
+        </div>
+
+        <div
+          class="timeline empty"
+          id="timeline"
+          aria-live="polite"
+          aria-relevant="additions"
+        >
           <div class="empty-state">
-            <div class="pulse-logo">⚡</div>
+            <div class="pulse-logo" aria-hidden="true">⚡</div>
             <h3>Ready for a live task</h3>
             <p>
-              OpenClaw will call one endpoint. vLLM Semantic Router will decide
-              which model and reasoning effort handles every turn.
+              OpenClaw calls one endpoint. The semantic router chooses local
+              Qwen, Fireworks GLM, or premium Kimi—and reports why.
             </p>
           </div>
         </div>
 
-        <div class="result hidden" id="result-panel">
+        <div class="result hidden" id="result-panel" aria-live="polite">
           <div class="result-heading">
             <div>
               <span class="section-label">FINAL RESULT</span>
               <h3 id="result-title">Task complete</h3>
             </div>
-            <span class="result-status">VERIFIED</span>
+            <span class="result-status" id="result-status">COMPLETED</span>
           </div>
           <div class="result-body" id="result-body"></div>
           <div class="artifact-list" id="artifact-list"></div>
         </div>
       </section>
 
-      <aside class="panel intelligence-panel">
+      <aside
+        class="panel intelligence-panel"
+        aria-labelledby="intelligence-heading"
+      >
         <div class="panel-heading">
           <span class="step">03</span>
           <div>
-            <h2>Routing intelligence</h2>
-            <p>Why each prompt went where it did.</p>
+            <h2 id="intelligence-heading">Routing intelligence</h2>
+            <p>Why each call went where it did—and at what effort.</p>
           </div>
         </div>
 
@@ -134,29 +159,54 @@
             <strong id="metric-calls">0</strong>
           </div>
           <div class="metric">
-            <span>ROUTED COST</span>
-            <strong id="metric-cost">$0.0000</strong>
+            <span>CLOUD API COST*</span>
+            <strong id="metric-cost">$0.00000</strong>
           </div>
           <div class="metric premium">
-            <span>ALL-KIMI</span>
-            <strong id="metric-kimi">$0.0000</strong>
+            <span>ALL-KIMI EST.*</span>
+            <strong id="metric-kimi">$0.00000</strong>
           </div>
           <div class="metric savings">
-            <span>SAVED VS KIMI</span>
-            <strong id="metric-savings">0%</strong>
+            <span>EST. SAVINGS</span>
+            <strong id="metric-savings">—</strong>
           </div>
+        </div>
+
+        <div class="token-strip" aria-label="Run token telemetry">
+          <span>
+            <small>PROMPT</small>
+            <strong id="metric-prompt-tokens">0</strong>
+          </span>
+          <span>
+            <small>OUTPUT</small>
+            <strong id="metric-output-tokens">0</strong>
+          </span>
+          <span>
+            <small>REASONING</small>
+            <strong id="metric-reasoning-tokens">0</strong>
+          </span>
         </div>
 
         <div class="cost-bar-wrap">
           <div class="cost-labels">
-            <span>Routed task</span>
-            <span>All-premium baseline</span>
+            <span>Routed cloud API</span>
+            <span>All-Kimi estimate</span>
           </div>
           <div class="cost-bar">
             <div class="cost-fill" id="cost-fill"></div>
           </div>
           <p id="cost-explainer">
-            Cost updates as model calls complete.
+            Cloud token/API estimates update as model calls complete.
+          </p>
+        </div>
+
+        <div class="cost-scope" role="note">
+          <strong>Cost scope</strong>
+          <p>
+            Displayed cost is cloud token/API cost only and excludes local AMD
+            Instinct MI300X hardware, hosting, power, and operating costs.
+            “All-Kimi” reprices the observed tokens at Kimi K3 API rates; it is
+            an estimate, not a second run.
           </p>
         </div>
 
@@ -168,7 +218,8 @@
         <div class="route-detail">
           <div class="section-label">LATEST ROUTE</div>
           <div class="route-placeholder" id="route-detail">
-            Select a task to see the router explain its decision.
+            Run a task to see the selected model, matched signals, and
+            router-requested reasoning effort.
           </div>
         </div>
       </aside>
@@ -179,7 +230,7 @@
       <span class="footer-arrow">→</span>
       <span>vLLM Semantic Router</span>
       <span class="footer-arrow">→</span>
-      <span>AMD Instinct + Fireworks</span>
+      <span>Local AMD Instinct + Fireworks</span>
     </footer>
 
     <script src="/static/app.js"></script>

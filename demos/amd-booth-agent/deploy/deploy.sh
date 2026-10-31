@@ -20,6 +20,9 @@ mkdir -p \
   data/router-models \
   data/booth
 
+# The booth image runs OpenClaw as its dedicated UID/GID.
+chown -R 10001:10001 data/booth
+
 "$ROOT/deploy/render-config.sh"
 
 docker compose pull local-model router

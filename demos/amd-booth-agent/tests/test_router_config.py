@@ -37,6 +37,28 @@ def test_router_pool_and_priority_order(tmp_path):
     assert routes["code_agentic"] == "zai/glm-5.3-flash"
     assert routes["frontier"] == "moonshot/kimi-k3"
     assert routes["recovery"] == "moonshot/kimi-k3"
+    context = {
+        row["name"]: row for row in body["routing"]["signals"]["context"]
+    }
+    assert context["beyond_qwen_window"]["min_tokens"] == "56K"
+    jailbreak = {
+        row["name"]: row for row in body["routing"]["signals"]["jailbreak"]
+    }
+    assert jailbreak["prompt_attack"]["threshold"] == 0.999
+    cards = {
+        row["name"]: row for row in body["routing"]["modelCards"]
+    }
+    assert cards["qwen/qwen3.8-27b"]["context_window_size"] == 65536
+    for model in body["providers"]["models"][1:]:
+        assert "chat_path" not in model["backend_refs"][0]
+        assert model["backend_refs"][0]["base_url"] == (
+            "http://fireworks-shim:8090/v1"
+        )
+    assert body["global"]["services"]["response_api"]["enabled"] is False
+    assert (
+        body["global"]["services"]["observability"]["tracing"]["enabled"]
+        is False
+    )
 
 
 def test_rendered_config_serializes(tmp_path):

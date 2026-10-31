@@ -64,12 +64,8 @@ def fireworks_backend(
         "backend_refs": [
             {
                 "name": logical_name.replace("/", "-"),
-                "base_url": "https://api.fireworks.ai/inference/v1",
+                "base_url": "http://fireworks-shim:8090/v1",
                 "provider": "openai",
-                "auth_header": "Authorization",
-                "auth_prefix": "Bearer",
-                "api_key_env": "FIREWORKS_API_KEY",
-                "chat_path": "/chat/completions",
                 "weight": 1,
             }
         ],
@@ -100,17 +96,17 @@ def static_decision(
     use_reasoning: bool = True,
 ) -> dict[str, Any]:
     value = rule(name, priority, conditions)
+    model_ref: dict[str, Any] = {
+        "model": model,
+        "use_reasoning": use_reasoning,
+    }
+    if use_reasoning:
+        model_ref["reasoning_effort"] = effort
     value.update(
         {
             "description": description,
             "algorithm": {"type": "static"},
-            "modelRefs": [
-                {
-                    "model": model,
-                    "use_reasoning": use_reasoning,
-                    "reasoning_effort": effort,
-                }
-            ],
+            "modelRefs": [model_ref],
         }
     )
     return value
@@ -169,7 +165,7 @@ def build_decisions(base: dict[str, Any]) -> list[dict[str, Any]]:
                 "Code requests with tools use Fireworks GLM-5.3-Flash."
             ),
             model=GLM_MODEL,
-            effort="medium",
+            effort="low",
             conditions=[
                 {"type": "decision", "name": "task", "label": "code"},
                 {
@@ -226,7 +222,7 @@ def build_decisions(base: dict[str, Any]) -> list[dict[str, Any]]:
             priority=600,
             description="Exact factual work uses Fireworks GLM-5.3-Flash.",
             model=GLM_MODEL,
-            effort="medium",
+            effort="low",
             conditions=[
                 {"type": "decision", "name": "precise_facts"},
                 {
@@ -255,7 +251,7 @@ def build_decisions(base: dict[str, Any]) -> list[dict[str, Any]]:
             priority=450,
             description="Code generation and debugging use GLM-5.3-Flash.",
             model=GLM_MODEL,
-            effort="medium",
+            effort="low",
             conditions=[
                 {"type": "decision", "name": "task", "label": "code"},
                 {
@@ -312,6 +308,20 @@ def build_decisions(base: dict[str, Any]) -> list[dict[str, Any]]:
 def render(args: argparse.Namespace) -> dict[str, Any]:
     config = yaml.safe_load(args.input.read_text(encoding="utf-8"))
     config.pop("evaluation", None)
+    for signal in config["routing"]["signals"]["jailbreak"]:
+        if signal.get("name") == "prompt_attack":
+            # OpenClaw's trusted subagent context contains delegation language
+            # that resembles prompt injection. Keep the guard for very-high
+            # confidence attacks without blocking normal orchestration.
+            signal["threshold"] = 0.999
+    for signal in config["routing"]["signals"]["context"]:
+        if signal.get("name") == "beyond_qwen_window":
+            # The booth serves local Qwen with a 65,536-token window. Route
+            # before that hard limit so the model still has room to answer.
+            signal["min_tokens"] = "56K"
+            signal["description"] = (
+                "Inputs too large for the booth's 65K local Qwen window."
+            )
     config["entrypoints"] = [{"model_names": ["vllm-sr/auto"], "recipe": "default"}]
     config["providers"] = {
         "defaults": {"model": LOCAL_MODEL},
@@ -338,6 +348,7 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
     config["routing"]["modelCards"] = [
         {
             "name": LOCAL_MODEL,
+            "context_window_size": 65536,
             "description": (
                 "Local AMD MI300X model for fast, standard and vision work. "
                 "No external API charge."
@@ -356,15 +367,22 @@ def render(args: argparse.Namespace) -> dict[str, Any]:
             "name": KIMI_MODEL,
             "description": (
                 "Fireworks Kimi K3 for premium frontier reasoning, recovery, "
-                "vision and million-token context."
+                "and long-context work."
             ),
             "tags": ["location:fireworks", "role:frontier", "role:recovery"],
         },
     ]
     config["routing"]["decisions"] = build_decisions(config)
-    config.setdefault("global", {}).setdefault("services", {}).setdefault(
-        "router_replay", {}
-    ).update(
+    global_config = config.setdefault("global", {})
+    services = global_config.setdefault("services", {})
+    services["response_api"] = {"enabled": False}
+    services.setdefault("observability", {}).setdefault(
+        "tracing", {}
+    )["enabled"] = False
+    global_config.setdefault("stores", {})["response_cache"] = {
+        "enabled": False
+    }
+    services.setdefault("router_replay", {}).update(
         {
             "enabled": True,
             "capture_personal_data": False,
