@@ -14,13 +14,21 @@
     <a class="skip-link" href="#task-input">Skip to task</a>
     <div class="ambient ambient-one" aria-hidden="true"></div>
     <div class="ambient ambient-two" aria-hidden="true"></div>
+    <div class="amd-grid" aria-hidden="true"></div>
 
     <header class="topbar">
       <div class="brand">
-        <div class="amd-mark" aria-label="AMD">AMD</div>
+        <img
+          class="amd-logo"
+          src="/static/amd-logo-white.png"
+          alt="AMD"
+          width="142"
+          height="34"
+        />
+        <span class="brand-rule" aria-hidden="true"></span>
         <div>
-          <div class="eyebrow">OPEN AGENT EXPERIENCE</div>
-          <h1>Agent Studio</h1>
+          <div class="eyebrow">AMD INSTINCT™ AI EXPERIENCE</div>
+          <h1>Open Agent Studio</h1>
         </div>
       </div>
       <div class="top-status" role="status" aria-live="polite">
@@ -118,8 +126,16 @@
           aria-live="polite"
           aria-relevant="additions"
         >
-          <div class="empty-state">
-            <div class="pulse-logo" aria-hidden="true">⚡</div>
+          <div class="empty-state amd-empty-state">
+            <div class="amd-hero-mark" aria-hidden="true">
+              <img
+                src="/static/amd-chevron.png"
+                alt=""
+                width="49"
+                height="46"
+              />
+            </div>
+            <div class="empty-kicker">AMD INSTINCT AI</div>
             <h3>Ready for a live task</h3>
             <p>
               OpenClaw calls one endpoint. The semantic router chooses local
@@ -226,11 +242,19 @@
     </main>
 
     <footer>
+      <img
+        class="footer-logo"
+        src="/static/amd-lockup-white.png"
+        alt="AMD — together we advance"
+        width="122"
+        height="35"
+      />
+      <span class="footer-divider" aria-hidden="true"></span>
       <span>OpenClaw</span>
       <span class="footer-arrow">→</span>
       <span>vLLM Semantic Router</span>
       <span class="footer-arrow">→</span>
-      <span>Local AMD Instinct + Fireworks</span>
+      <span>AMD Instinct + Fireworks</span>
     </footer>
 
     <script src="/static/app.js"></script>
