@@ -1,0 +1,148 @@
+name: amd-openclaw-booth
+
+x-gpu: &gpu
+  devices:
+    - /dev/kfd
+    - /dev/dri
+  group_add:
+    - "44"
+    - "992"
+  security_opt:
+    - seccomp=unconfined
+  restart: unless-stopped
+
+services:
+  local-model:
+    <<: *gpu
+    image: docker.io/vllm/vllm-openai-rocm:v0.32.0
+    entrypoint: ["vllm", "serve"]
+    shm_size: 64g
+    environment:
+      ROCR_VISIBLE_DEVICES: "0"
+      HF_HUB_CACHE: /root/.cache/huggingface/hub
+      HF_HUB_ENABLE_HF_TRANSFER: "1"
+    command:
+      - "${LOCAL_MODEL_REPO:-Qwen/Qwen3.8-27B-FP8}"
+      - "--served-model-name"
+      - "${LOCAL_SERVED_MODEL:-qwen/qwen3.8-27b}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8000"
+      - "--max-model-len"
+      - "${LOCAL_MAX_MODEL_LEN:-65536}"
+      - "--gpu-memory-utilization"
+      - "${LOCAL_GPU_MEMORY_UTILIZATION:-0.62}"
+      - "--attention-backend"
+      - "TRITON_ATTN"
+      - "--reasoning-parser"
+      - "qwen3"
+      - "--enable-auto-tool-choice"
+      - "--tool-call-parser"
+      - "qwen3_xml"
+    volumes:
+      - ./data/hf:/root/.cache/huggingface/hub
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:8000/health", timeout=5)
+      interval: 20s
+      timeout: 10s
+      start_period: 30m
+      retries: 6
+
+  router:
+    <<: *gpu
+    image: "${ROUTER_IMAGE:-ghcr.io/vllm-project/semantic-router/vllm-sr-rocm@sha256:5d76c418872e8070e79e5db29d391c168d18e34664ae5c236c662b27d9eee16d}"
+    user: "0:0"
+    entrypoint: ["/bin/sh", "/app/booth/router-entrypoint.sh"]
+    command:
+      - "-gateway=standalone"
+      - "-listener-address=0.0.0.0"
+      - "--secure=false"
+    environment:
+      ROCR_VISIBLE_DEVICES: "0"
+      HOME: /tmp
+      TMPDIR: /tmp
+      HF_HOME: /app/models/.cache/huggingface
+      VLLM_SR_SOURCE_CONFIG_PATH: /app/config/config.yaml
+      VLLM_SR_RUNTIME_CONFIG_PATH: /app/config/config.yaml
+    volumes:
+      - ./router:/app/booth:ro
+      - ./data/router-config:/app/config
+      - ./data/router-models:/app/models
+    secrets:
+      - fireworks_api_key
+    depends_on:
+      local-model:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:18899:8899"
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:8899/v1/models", timeout=5)
+      interval: 20s
+      timeout: 10s
+      start_period: 15m
+      retries: 6
+
+  booth:
+    build:
+      context: ./control
+      args:
+        OPENCLAW_VERSION: "${OPENCLAW_VERSION:-2026.10.4}"
+    image: "${BOOTH_IMAGE:-amd-openclaw-booth:local}"
+    restart: unless-stopped
+    depends_on:
+      router:
+        condition: service_healthy
+    environment:
+      BOOTH_DATA_DIR: /data
+      BOOTH_RUNS_DIR: /data/runs
+      OPENCLAW_STATE_DIR: /data/openclaw
+      OPENCLAW_WORKSPACES: /data/agents
+      ROUTER_BASE_URL: http://router:8899/v1
+      ROUTER_MODEL: vllm-sr/auto
+      BOOTH_PUBLIC_ORIGIN: "https://${BOOTH_HOSTNAME:-agent.165.245.129.230.sslip.io}"
+      BROWSER_EXECUTABLE_PATH: /usr/bin/chromium
+      PYTHONUNBUFFERED: "1"
+    volumes:
+      - ./data/booth:/data
+    ports:
+      - "127.0.0.1:${BOOTH_PORT:-18090}:8088"
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - DAC_OVERRIDE
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 1024
+    shm_size: 2g
+    healthcheck:
+      test:
+        - CMD
+        - python3
+        - -c
+        - >-
+          import urllib.request;
+          urllib.request.urlopen("http://127.0.0.1:8088/healthz", timeout=5)
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 8
+
+secrets:
+  fireworks_api_key:
+    file: ./secrets/fireworks_api_key

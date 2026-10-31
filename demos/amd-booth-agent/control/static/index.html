@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="AMD OpenClaw Mixture-of-Models booth experience"
+    />
+    <title>AMD Agent Studio</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-one"></div>
+    <div class="ambient ambient-two"></div>
+
+    <header class="topbar">
+      <div class="brand">
+        <div class="amd-mark">AMD</div>
+        <div>
+          <div class="eyebrow">OPEN AGENT EXPERIENCE</div>
+          <h1>Agent Studio</h1>
+        </div>
+      </div>
+      <div class="top-status">
+        <span class="status-dot" id="system-dot"></span>
+        <span id="system-label">Connecting to model pool…</span>
+        <span class="mi300x-badge">MI300X · 192 GB HBM</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="panel compose-panel">
+        <div class="panel-heading">
+          <span class="step">01</span>
+          <div>
+            <h2>Give OpenClaw a mission</h2>
+            <p>Choose a booth challenge or write your own.</p>
+          </div>
+        </div>
+
+        <div class="suggestions" id="suggestions"></div>
+
+        <label class="prompt-label" for="task-input">
+          Visitor task
+          <span id="char-count">0 / 4000</span>
+        </label>
+        <textarea
+          id="task-input"
+          maxlength="4000"
+          placeholder="Ask the agent to research, build, debug, browse, compare, or create…"
+        ></textarea>
+
+        <div class="actions">
+          <button class="primary" id="run-button">
+            <span>Run agent</span>
+            <span class="arrow">→</span>
+          </button>
+          <button class="secondary" id="clear-button">Clear</button>
+        </div>
+
+        <div class="pool">
+          <div class="section-label">LIVE MODEL POOL</div>
+          <div id="model-pool"></div>
+        </div>
+      </aside>
+
+      <section class="panel timeline-panel">
+        <div class="panel-heading timeline-heading">
+          <span class="step">02</span>
+          <div>
+            <h2>Watch the agent work</h2>
+            <p>Every model call, tool, subagent and routing decision.</p>
+          </div>
+          <div class="run-clock" id="run-clock">00:00</div>
+        </div>
+
+        <div class="agent-map" id="agent-map">
+          <div class="agent-node active" data-agent="main">
+            <span>MAIN</span>
+            <strong>Coordinator</strong>
+          </div>
+          <div class="agent-connector"></div>
+          <div class="agent-node" data-agent="researcher">
+            <span>SUBAGENT</span>
+            <strong>Researcher</strong>
+          </div>
+          <div class="agent-node" data-agent="builder">
+            <span>SUBAGENT</span>
+            <strong>Builder</strong>
+          </div>
+          <div class="agent-node" data-agent="reviewer">
+            <span>SUBAGENT</span>
+            <strong>Reviewer</strong>
+          </div>
+        </div>
+
+        <div class="timeline empty" id="timeline">
+          <div class="empty-state">
+            <div class="pulse-logo">⚡</div>
+            <h3>Ready for a live task</h3>
+            <p>
+              OpenClaw will call one endpoint. vLLM Semantic Router will decide
+              which model and reasoning effort handles every turn.
+            </p>
+          </div>
+        </div>
+
+        <div class="result hidden" id="result-panel">
+          <div class="result-heading">
+            <div>
+              <span class="section-label">FINAL RESULT</span>
+              <h3 id="result-title">Task complete</h3>
+            </div>
+            <span class="result-status">VERIFIED</span>
+          </div>
+          <div class="result-body" id="result-body"></div>
+          <div class="artifact-list" id="artifact-list"></div>
+        </div>
+      </section>
+
+      <aside class="panel intelligence-panel">
+        <div class="panel-heading">
+          <span class="step">03</span>
+          <div>
+            <h2>Routing intelligence</h2>
+            <p>Why each prompt went where it did.</p>
+          </div>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric">
+            <span>MODEL CALLS</span>
+            <strong id="metric-calls">0</strong>
+          </div>
+          <div class="metric">
+            <span>ROUTED COST</span>
+            <strong id="metric-cost">$0.0000</strong>
+          </div>
+          <div class="metric premium">
+            <span>ALL-KIMI</span>
+            <strong id="metric-kimi">$0.0000</strong>
+          </div>
+          <div class="metric savings">
+            <span>SAVED VS KIMI</span>
+            <strong id="metric-savings">0%</strong>
+          </div>
+        </div>
+
+        <div class="cost-bar-wrap">
+          <div class="cost-labels">
+            <span>Routed task</span>
+            <span>All-premium baseline</span>
+          </div>
+          <div class="cost-bar">
+            <div class="cost-fill" id="cost-fill"></div>
+          </div>
+          <p id="cost-explainer">
+            Cost updates as model calls complete.
+          </p>
+        </div>
+
+        <div class="distribution">
+          <div class="section-label">CALL DISTRIBUTION</div>
+          <div id="distribution"></div>
+        </div>
+
+        <div class="route-detail">
+          <div class="section-label">LATEST ROUTE</div>
+          <div class="route-placeholder" id="route-detail">
+            Select a task to see the router explain its decision.
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <footer>
+      <span>OpenClaw</span>
+      <span class="footer-arrow">→</span>
+      <span>vLLM Semantic Router</span>
+      <span class="footer-arrow">→</span>
+      <span>AMD Instinct + Fireworks</span>
+    </footer>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>

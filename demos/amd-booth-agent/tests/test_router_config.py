@@ -1,0 +1,53 @@
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+from types import SimpleNamespace
+
+import yaml
+
+
+ROOT = Path(__file__).resolve().parents[1]
+spec = importlib.util.spec_from_file_location(
+    "render_config",
+    ROOT / "router/render_config.py",
+)
+assert spec and spec.loader
+render_config = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(render_config)
+
+
+def test_router_pool_and_priority_order(tmp_path):
+    args = SimpleNamespace(
+        input=ROOT / "router/decision-balance-base.yaml",
+        output=tmp_path / "config.yaml",
+        kimi_provider_model="accounts/fireworks/models/kimi-k3",
+    )
+    body = render_config.render(args)
+    assert [row["name"] for row in body["providers"]["models"]] == [
+        "qwen/qwen3.8-27b",
+        "zai/glm-5.3-flash",
+        "moonshot/kimi-k3",
+    ]
+    decisions = body["routing"]["decisions"]
+    priorities = [int(row["priority"]) for row in decisions]
+    assert priorities == sorted(priorities, reverse=True)
+    routes = {row["name"]: row["modelRefs"][0]["model"] for row in decisions if row.get("modelRefs")}
+    assert routes["fast"] == "qwen/qwen3.8-27b"
+    assert routes["code_agentic"] == "zai/glm-5.3-flash"
+    assert routes["frontier"] == "moonshot/kimi-k3"
+    assert routes["recovery"] == "moonshot/kimi-k3"
+
+
+def test_rendered_config_serializes(tmp_path):
+    output = tmp_path / "config.yaml"
+    args = SimpleNamespace(
+        input=ROOT / "router/decision-balance-base.yaml",
+        output=output,
+        kimi_provider_model="accounts/fireworks/models/kimi-k3",
+    )
+    body = render_config.render(args)
+    output.write_text(yaml.safe_dump(body, sort_keys=False), encoding="utf-8")
+    assert yaml.safe_load(output.read_text())["entrypoints"][0]["model_names"] == [
+        "vllm-sr/auto"
+    ]

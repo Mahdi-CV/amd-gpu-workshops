@@ -1,0 +1,10 @@
+agent.165.245.129.230.sslip.io {
+	encode zstd gzip
+
+	reverse_proxy 127.0.0.1:18090 {
+		flush_interval -1
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-Proto {scheme}
+	}
+}
