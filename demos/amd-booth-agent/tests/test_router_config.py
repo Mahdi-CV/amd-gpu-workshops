@@ -37,6 +37,18 @@ def test_router_pool_and_priority_order(tmp_path):
     assert routes["code_agentic"] == "zai/glm-5.3-flash"
     assert routes["frontier"] == "moonshot/kimi-k3"
     assert routes["recovery"] == "moonshot/kimi-k3"
+    recovery = next(
+        row for row in decisions if row["name"] == "recovery"
+    )
+    assert {
+        "operator": "NOT",
+        "conditions": [
+            {
+                "type": "conversation",
+                "name": "tool_loop",
+            }
+        ],
+    } in recovery["rules"]["conditions"]
     context = {
         row["name"]: row for row in body["routing"]["signals"]["context"]
     }

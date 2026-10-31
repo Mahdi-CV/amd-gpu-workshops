@@ -156,6 +156,15 @@ def build_decisions(base: dict[str, Any]) -> list[dict[str, Any]]:
             conditions=[
                 {"type": "conversation", "name": "has_prior_answer"},
                 {"type": "decision", "name": "correction"},
+                {
+                    "operator": "NOT",
+                    "conditions": [
+                        {
+                            "type": "conversation",
+                            "name": "tool_loop",
+                        }
+                    ],
+                },
             ],
         ),
         static_decision(
