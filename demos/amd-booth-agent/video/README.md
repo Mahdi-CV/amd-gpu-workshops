@@ -6,7 +6,7 @@ AMD OpenClaw + vLLM Semantic Router live booth demo.
 ## Deliverables
 
 - `amd-booth-teaser.mp4` — rendered 1920×1080 H.264/AAC booth loop.
-- `poster.jpg` — frame from the final booth invitation.
+- `poster.jpg` — frame from the final mixture-of-models message.
 - `STORYBOARD.md` — exact timeline, on-screen copy, optional voiceover, and
   cost-estimate scope.
 - `teaser.html` — self-contained animation source. It references the exact AMD

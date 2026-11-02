@@ -1259,200 +1259,279 @@
         color: #d9dde2;
       }
 
-      /* Artifacts */
-      .artifact-layout {
+      /* Outcomes */
+      .outcome-layout {
         display: grid;
-        grid-template-columns: 1.2fr 0.8fr;
+        grid-template-columns: 1.18fr 0.82fr;
         gap: 30px;
         height: 640px;
       }
 
-      .browser-artifact {
+      .pool-panel {
         position: relative;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        padding: 30px;
         opacity: 0;
       }
 
-      .browser-chrome {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        height: 48px;
-        padding: 0 17px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        background: #181a1e;
-      }
-
-      .browser-dot {
-        width: 9px;
-        height: 9px;
-        border-radius: 50%;
-        background: #555a62;
-      }
-
-      .address {
-        flex: 1;
-        height: 27px;
-        margin-left: 10px;
-        padding: 6px 13px;
-        border-radius: 7px;
-        color: #89919b;
-        background: #0d0e11;
-        font-size: 10px;
-      }
-
-      .artifact-preview {
-        height: calc(100% - 48px);
-        padding: 32px;
+      .pool-panel::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
         background:
-          radial-gradient(circle at 82% 0%, rgba(237, 28, 36, 0.14), transparent 35%),
-          linear-gradient(145deg, #08090b, #101217);
+          radial-gradient(circle at 14% 0%, rgba(237, 28, 36, 0.14), transparent 32%),
+          linear-gradient(145deg, rgba(255, 255, 255, 0.025), transparent 45%);
       }
 
-      .artifact-preview-head {
+      .pool-header {
+        position: relative;
         display: flex;
         align-items: center;
         justify-content: space-between;
       }
 
-      .artifact-preview-head img {
-        width: 108px;
-        height: auto;
-      }
-
-      .artifact-preview-head span {
-        color: #8d949e;
-        font-size: 10px;
-        font-weight: 800;
-        letter-spacing: 0.1em;
+      .pool-header span {
+        color: var(--red-bright);
+        font-size: 11px;
+        font-weight: 900;
+        letter-spacing: 0.13em;
         text-transform: uppercase;
       }
 
-      .artifact-preview h3 {
-        max-width: 650px;
-        margin: 48px 0 14px;
-        font-size: 43px;
-        line-height: 1.03;
-        letter-spacing: -0.045em;
+      .pool-header small {
+        color: #858c96;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
       }
 
-      .artifact-preview > p {
-        max-width: 620px;
-        margin: 0;
-        color: #aab1bb;
-        font-size: 15px;
-        line-height: 1.5;
+      .pool-endpoint {
+        position: relative;
+        display: flex;
+        align-items: center;
+        gap: 17px;
+        margin-top: 22px;
+        padding: 18px 20px;
+        border: 1px solid rgba(237, 28, 36, 0.28);
+        border-radius: 14px;
+        background: rgba(237, 28, 36, 0.07);
+        opacity: 0;
       }
 
-      .accelerator-cards {
+      .endpoint-icon {
         display: grid;
-        grid-template-columns: repeat(2, 1fr);
-        gap: 15px;
-        margin-top: 34px;
+        place-items: center;
+        width: 48px;
+        height: 48px;
+        border-radius: 12px;
+        color: white;
+        background: var(--red);
+        font-size: 21px;
+        font-weight: 900;
       }
 
-      .accelerator-card {
-        min-height: 172px;
-        padding: 21px;
+      .pool-endpoint strong {
+        display: block;
+        font-size: 19px;
+      }
+
+      .pool-endpoint small {
+        display: block;
+        margin-top: 5px;
+        color: #aab1bb;
+        font-size: 12px;
+      }
+
+      .pool-endpoint b {
+        margin-left: auto;
+        color: #c9ced5;
+        font-size: 10px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .pool-connector {
+        position: relative;
+        width: 100%;
+        height: 44px;
+        opacity: 0;
+      }
+
+      .pool-connector::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 50%;
+        width: 2px;
+        height: 24px;
+        background: linear-gradient(var(--red), rgba(237, 28, 36, 0.25));
+      }
+
+      .pool-connector::after {
+        content: "";
+        position: absolute;
+        left: 16.67%;
+        right: 16.67%;
+        bottom: 0;
+        height: 2px;
+        background: linear-gradient(90deg, var(--red), #6e737c, var(--gold));
+      }
+
+      .pool-models {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+      }
+
+      .pool-model {
+        position: relative;
+        min-height: 205px;
+        padding: 21px 19px;
         border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 13px;
         background: rgba(255, 255, 255, 0.03);
+        opacity: 0;
       }
 
-      .accelerator-card b {
+      .pool-model::before {
+        content: "";
+        position: absolute;
+        top: -1px;
+        left: 18px;
+        right: 18px;
+        height: 3px;
+        border-radius: 999px;
+        background: var(--model-color);
+      }
+
+      .pool-model b {
         display: block;
-        color: var(--red-bright);
+        color: var(--model-color);
         font-size: 11px;
         letter-spacing: 0.12em;
         text-transform: uppercase;
       }
 
-      .accelerator-card strong {
+      .pool-model strong {
         display: block;
-        margin-top: 9px;
-        font-size: 27px;
+        margin-top: 14px;
+        font-size: 23px;
+        line-height: 1.05;
       }
 
-      .accelerator-card span {
-        display: block;
-        margin-top: 42px;
+      .pool-model p {
+        min-height: 45px;
+        margin: 14px 0 0;
         color: #a8afb8;
         font-size: 12px;
+        line-height: 1.45;
       }
 
-      .artifact-side {
+      .pool-model span {
+        display: block;
+        margin-top: 23px;
+        color: #d9dde2;
+        font-size: 10px;
+        font-weight: 850;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      .pool-policy {
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+        margin-top: auto;
+        padding: 18px 20px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.025);
+        opacity: 0;
+      }
+
+      .pool-policy span {
+        color: #858c96;
+        font-size: 10px;
+        font-weight: 850;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .pool-policy strong {
+        font-size: 13px;
+        text-align: right;
+      }
+
+      .outcome-benefits {
         display: flex;
         flex-direction: column;
         gap: 14px;
       }
 
-      .artifact-file,
-      .review-check {
+      .outcome-benefit {
+        position: relative;
+        flex: 1;
+        display: grid;
+        grid-template-columns: 62px 1fr;
+        align-items: center;
+        gap: 18px;
+        padding: 23px;
+        overflow: hidden;
         opacity: 0;
       }
 
-      .artifact-file {
-        display: flex;
-        align-items: center;
-        gap: 15px;
-        min-height: 83px;
-        padding: 18px 20px;
-      }
-
-      .file-icon {
-        display: grid;
-        place-items: center;
-        width: 42px;
-        height: 42px;
-        border-radius: 10px;
-        color: var(--red-bright);
-        background: rgba(237, 28, 36, 0.1);
-        font-size: 13px;
-        font-weight: 900;
-      }
-
-      .artifact-file strong {
-        display: block;
-        font-size: 16px;
-      }
-
-      .artifact-file small {
-        display: block;
-        margin-top: 4px;
-        color: var(--muted);
-        font-size: 11px;
-      }
-
-      .review-panel {
-        flex: 1;
-        padding: 23px;
-      }
-
-      .review-panel h3 {
-        margin: 8px 0 18px;
-        font-size: 23px;
-      }
-
-      .review-check {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        margin-top: 13px;
-        color: #dbe0e5;
-        font-size: 14px;
-      }
-
-      .review-check i {
-        display: grid;
-        place-items: center;
-        width: 26px;
-        height: 26px;
+      .outcome-benefit::after {
+        content: "";
+        position: absolute;
+        right: -42px;
+        bottom: -66px;
+        width: 150px;
+        height: 150px;
         border-radius: 50%;
-        color: #08130d;
-        background: var(--green);
-        font-style: normal;
-        font-size: 14px;
+        background: var(--benefit-color);
+        filter: blur(2px);
+        opacity: 0.055;
+      }
+
+      .benefit-icon {
+        display: grid;
+        place-items: center;
+        width: 62px;
+        height: 62px;
+        border: 1px solid var(--benefit-color);
+        border-radius: 15px;
+        color: var(--benefit-color);
+        background: rgba(255, 255, 255, 0.025);
+        font-size: 21px;
         font-weight: 900;
+      }
+
+      .outcome-benefit b {
+        display: block;
+        color: var(--benefit-color);
+        font-size: 11px;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .outcome-benefit strong {
+        display: block;
+        margin-top: 6px;
+        font-size: 24px;
+        line-height: 1.05;
+      }
+
+      .outcome-benefit p {
+        margin: 9px 0 0;
+        color: #aab1bb;
+        font-size: 12px;
+        line-height: 1.45;
       }
 
       /* CTA */
@@ -1900,77 +1979,116 @@
           </div>
         </section>
 
-        <section class="scene artifacts" id="scene-artifacts" aria-label="Reviewed artifacts">
+        <section
+          class="scene outcomes"
+          id="scene-outcomes"
+          aria-label="Quality, cost, and model-pool outcomes"
+        >
           <div class="scene-heading">
             <div>
-              <span class="eyebrow">CONCRETE OUTPUT</span>
-              <h2>PROMPT IN. <span class="red">REVIEWED ARTIFACTS OUT.</span></h2>
+              <span class="eyebrow">ROUTING OUTCOME</span>
+              <h2>RETAIN ACCURACY. <span class="red">SAVE COST.</span></h2>
             </div>
-            <p>Not just an answer: files you can open, inspect, and take with you.</p>
+            <p>Build a model pool around your workload—not one model around every call.</p>
           </div>
-          <div class="artifact-layout">
-            <article class="browser-artifact panel" id="browser-artifact">
-              <div class="browser-chrome">
-                <span class="browser-dot"></span>
-                <span class="browser-dot"></span>
-                <span class="browser-dot"></span>
-                <span class="address">artifact://amd-accelerator-brief.html</span>
+          <div class="outcome-layout">
+            <article class="pool-panel panel" id="pool-panel">
+              <div class="pool-header">
+                <span>YOUR MODEL POOL</span>
+                <small>ONE OPENAI-COMPATIBLE ENDPOINT</small>
               </div>
-              <div class="artifact-preview">
-                <div class="artifact-preview-head">
-                  <img src="../control/static/amd-logo-white.png" alt="AMD" />
-                  <span>EXAMPLE OUTPUT · PRIMARY-SOURCE CITATIONS</span>
+              <div class="pool-endpoint" id="pool-endpoint">
+                <span class="endpoint-icon">SR</span>
+                <div>
+                  <strong>vLLM Semantic Router</strong>
+                  <small>Task + context + reasoning effort</small>
                 </div>
-                <h3>AMD Instinct™ accelerator comparison</h3>
-                <p>A booth-ready, self-contained microsite with structured source notes and review status.</p>
-                <div class="accelerator-cards">
-                  <div class="accelerator-card">
-                    <b>ACCELERATOR</b>
-                    <strong>AMD Instinct MI300X</strong>
-                    <span>Product overview · cited source links →</span>
-                  </div>
-                  <div class="accelerator-card">
-                    <b>ACCELERATOR</b>
-                    <strong>AMD Instinct MI325X</strong>
-                    <span>Product overview · cited source links →</span>
-                  </div>
-                </div>
+                <b>AUTOMATIC SELECTION</b>
+              </div>
+              <div class="pool-connector" id="pool-connector" aria-hidden="true"></div>
+              <div class="pool-models">
+                <article
+                  class="pool-model"
+                  id="pool-model-local"
+                  style="--model-color:#ed1c24"
+                >
+                  <b>LOCAL MODEL</b>
+                  <strong>Fast + controlled</strong>
+                  <p>Keep routine or sensitive work close to the application.</p>
+                  <span>EVERYDAY CALLS</span>
+                </article>
+                <article
+                  class="pool-model"
+                  id="pool-model-cloud"
+                  style="--model-color:#00c2de"
+                >
+                  <b>CLOUD MODEL</b>
+                  <strong>Scalable + capable</strong>
+                  <p>Handle tools, agentic workflows, and burst demand.</p>
+                  <span>MULTI-STEP WORK</span>
+                </article>
+                <article
+                  class="pool-model"
+                  id="pool-model-specialist"
+                  style="--model-color:#d7bd74"
+                >
+                  <b>SPECIALIST MODEL</b>
+                  <strong>Deep expertise</strong>
+                  <p>Escalate the hardest calls to premium capability.</p>
+                  <span>COMPLEX REQUESTS</span>
+                </article>
+              </div>
+              <div class="pool-policy" id="pool-policy">
+                <span>ROUTING POLICY</span>
+                <strong>QUALITY TARGETS · COST TARGETS · DEPLOYMENT CHOICE</strong>
               </div>
             </article>
-            <div class="artifact-side">
-              <article class="artifact-file panel" id="artifact-file-one">
-                <span class="file-icon">HTML</span>
+            <div class="outcome-benefits">
+              <article
+                class="outcome-benefit panel"
+                id="benefit-accuracy"
+                style="--benefit-color:#56d890"
+              >
+                <span class="benefit-icon">✓</span>
                 <div>
-                  <strong>amd-accelerator-brief.html</strong>
-                  <small>Self-contained browser artifact</small>
+                  <b>QUALITY-AWARE</b>
+                  <strong>Retain accuracy targets</strong>
+                  <p>Escalate difficult work while simpler requests stay efficient.</p>
                 </div>
               </article>
-              <article class="artifact-file panel" id="artifact-file-two">
-                <span class="file-icon">MD</span>
+              <article
+                class="outcome-benefit panel"
+                id="benefit-cost"
+                style="--benefit-color:#ed1c24"
+              >
+                <span class="benefit-icon">↓</span>
                 <div>
-                  <strong>sources.md</strong>
-                  <small>Primary-source notes and citations</small>
+                  <b>COST-AWARE</b>
+                  <strong>Save inference cost</strong>
+                  <p>Reserve premium models for the calls that need their capability.</p>
                 </div>
               </article>
-              <article class="artifact-file panel" id="artifact-file-three">
-                <span class="file-icon">MD</span>
+              <article
+                class="outcome-benefit panel"
+                id="benefit-flexibility"
+                style="--benefit-color:#00c2de"
+              >
+                <span class="benefit-icon">＋</span>
                 <div>
-                  <strong>review.md</strong>
-                  <small>Reviewer findings and verification</small>
+                  <b>DEPLOYMENT-FLEXIBLE</b>
+                  <strong>Mix cloud + local models</strong>
+                  <p>Combine hosted APIs, dedicated endpoints, and local inference.</p>
                 </div>
-              </article>
-              <article class="review-panel panel">
-                <span class="mini-label">REVIEWER CHECK</span>
-                <h3>Task complete</h3>
-                <div class="review-check" id="review-one"><i>✓</i><span>Browser-ready artifact</span></div>
-                <div class="review-check" id="review-two"><i>✓</i><span>Citations included</span></div>
-                <div class="review-check" id="review-three"><i>✓</i><span>Reviewer verified</span></div>
               </article>
             </div>
           </div>
         </section>
 
-        <section class="scene cta" id="scene-cta" aria-label="Live at the AMD booth">
+        <section
+          class="scene cta"
+          id="scene-cta"
+          aria-label="Build a flexible mixture of models"
+        >
           <div class="cta-content">
             <img
               class="cta-lockup"
@@ -1978,18 +2096,21 @@
               src="../control/static/amd-lockup-white.png"
               alt="AMD — together we advance"
             />
-            <h2 id="cta-title">GIVE OPENCLAW<br /><span class="red">A MISSION.</span></h2>
-            <p class="cta-subtitle" id="cta-subtitle">Watch every route. Take home the artifacts.</p>
+            <h2 id="cta-title">
+              BUILD YOUR OWN<br /><span class="red">MIXTURE OF MODELS.</span>
+            </h2>
+            <p class="cta-subtitle" id="cta-subtitle">
+              One endpoint routing across cloud, specialized, and local models.
+            </p>
             <div class="live-pill" id="cta-live">
-              <span class="live-dot" aria-hidden="true"></span>
-              <span>LIVE NOW · AMD BOOTH</span>
+              <span>RETAIN ACCURACY · SAVE COST</span>
             </div>
             <div class="cta-flow" id="cta-flow">
               <span>OpenClaw</span>
               <span class="arrow">→</span>
               <span>vLLM Semantic Router</span>
               <span class="arrow">→</span>
-              <span>AMD Instinct + Fireworks</span>
+              <span>Your Model Pool</span>
             </div>
           </div>
           <img class="cta-chevron" src="../control/static/amd-chevron.png" alt="" />
@@ -2002,9 +2123,9 @@
           <span class="arrow">→</span>
           <span>vLLM Semantic Router</span>
           <span class="arrow">→</span>
-          <span>AMD Instinct + Fireworks</span>
+          <span>Local + Cloud Model Pool</span>
         </div>
-        <span class="scope-short">CLOUD API/TOKEN ESTIMATES EXCLUDE LOCAL HARDWARE</span>
+        <span class="scope-short">QUALITY-AWARE ROUTING · COST-AWARE SELECTION</span>
       </footer>
     </div>
 
@@ -2283,15 +2404,18 @@
           reveal("savings-block", ramp(local, 3.25, 0.6), 16);
         }
 
-        function updateArtifacts(time) {
+        function updateOutcomes(time) {
           const local = time - 46.8;
-          reveal("browser-artifact", ramp(local, 0.7, 0.7), 28, 0.98);
-          reveal("artifact-file-one", ramp(local, 1.6, 0.45), 20);
-          reveal("artifact-file-two", ramp(local, 2.35, 0.45), 20);
-          reveal("artifact-file-three", ramp(local, 3.1, 0.45), 20);
-          reveal("review-one", ramp(local, 4.0, 0.35), 12);
-          reveal("review-two", ramp(local, 4.7, 0.35), 12);
-          reveal("review-three", ramp(local, 5.4, 0.35), 12);
+          reveal("pool-panel", ramp(local, 0.55, 0.7), 28, 0.98);
+          reveal("pool-endpoint", ramp(local, 1.05, 0.45), 18);
+          reveal("pool-connector", ramp(local, 1.5, 0.35), 0);
+          reveal("pool-model-local", ramp(local, 1.85, 0.45), 18);
+          reveal("pool-model-cloud", ramp(local, 2.3, 0.45), 18);
+          reveal("pool-model-specialist", ramp(local, 2.75, 0.45), 18);
+          reveal("pool-policy", ramp(local, 3.35, 0.45), 12);
+          reveal("benefit-accuracy", ramp(local, 1.45, 0.45), 20);
+          reveal("benefit-cost", ramp(local, 2.45, 0.45), 20);
+          reveal("benefit-flexibility", ramp(local, 3.45, 0.45), 20);
         }
 
         function updateCTA(time) {
@@ -2313,12 +2437,12 @@
           setScene("scene-routing", t, 13.8, 29.45, 0.55, 0.65);
           setScene("scene-intelligence", t, 28.8, 39.45, 0.55, 0.65);
           setScene("scene-cost", t, 38.8, 47.45, 0.55, 0.65);
-          setScene("scene-artifacts", t, 46.8, 55.45, 0.55, 0.65);
+          setScene("scene-outcomes", t, 46.8, 55.45, 0.55, 0.65);
           setScene("scene-cta", t, 54.8, 60.0, 0.55, 0.0);
 
           $("progress-fill").style.width = `${(t / DURATION) * 100}%`;
           $("time-code").textContent = `00:${String(Math.floor(t)).padStart(2, "0")}`;
-          const chromeOpacity = 1 - ramp(t, 54.55, 0.65);
+          const chromeOpacity = 1 - ramp(t, 46.55, 0.65);
           $("brandbar").style.opacity = chromeOpacity.toFixed(4);
           $("progress-track").style.opacity = chromeOpacity.toFixed(4);
           $("footer-flow").style.opacity = chromeOpacity.toFixed(4);
@@ -2336,7 +2460,7 @@
           updateRouting(t);
           updateIntelligence(t);
           updateCost(t);
-          updateArtifacts(t);
+          updateOutcomes(t);
           updateCTA(t);
           return t;
         }
