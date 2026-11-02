@@ -241,6 +241,48 @@
       </aside>
     </main>
 
+    <dialog
+      class="route-inspector"
+      id="route-inspector"
+      aria-modal="true"
+      aria-labelledby="route-inspector-title"
+      aria-describedby="route-inspector-summary"
+      tabindex="-1"
+    >
+      <div class="route-inspector-panel">
+        <header class="route-inspector-header">
+          <div>
+            <span class="route-inspector-kicker" id="route-inspector-call-id">
+              MODEL ROUTE
+            </span>
+            <h2 id="route-inspector-title">Routing decision inspector</h2>
+            <p id="route-inspector-summary">
+              Request context and router evidence for this model call.
+            </p>
+          </div>
+          <button
+            class="route-inspector-close"
+            id="route-inspector-close"
+            type="button"
+            aria-label="Close routing decision inspector"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </header>
+        <div
+          class="route-inspector-content"
+          id="route-inspector-content"
+        ></div>
+      </div>
+    </dialog>
+
+    <div
+      class="sr-only"
+      id="route-inspector-announcer"
+      role="status"
+      aria-live="polite"
+    ></div>
+
     <footer>
       <img
         class="footer-logo"

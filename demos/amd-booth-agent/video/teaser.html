@@ -1,0 +1,2378 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="60-second AMD booth teaser for OpenClaw and vLLM Semantic Router"
+    />
+    <title>AMD Booth Agent — 60-second teaser</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #050506;
+        --panel: rgba(18, 19, 22, 0.94);
+        --panel-2: rgba(29, 31, 36, 0.94);
+        --line: #35383f;
+        --text: #f6f7f8;
+        --muted: #aab1bb;
+        --red: #ed1c24;
+        --red-bright: #ff4350;
+        --orange: #ff6a00;
+        --gold: #d7bd74;
+        --cyan: #00c2de;
+        --green: #56d890;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--text);
+        font-family: Inter, "Segoe UI", Arial, Helvetica, sans-serif;
+      }
+
+      body {
+        user-select: none;
+      }
+
+      #stage {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        min-width: 1280px;
+        min-height: 720px;
+        isolation: isolate;
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 76% 18%, rgba(237, 28, 36, 0.14), transparent 29%),
+          radial-gradient(circle at 22% 87%, rgba(0, 194, 222, 0.07), transparent 28%),
+          linear-gradient(145deg, #050506 0%, #0a0b0e 58%, #050506 100%);
+      }
+
+      .background-grid {
+        position: absolute;
+        inset: 0;
+        z-index: -5;
+        opacity: 0.34;
+        background-image:
+          linear-gradient(rgba(255, 255, 255, 0.026) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px);
+        background-size: 64px 64px;
+        mask-image: linear-gradient(to bottom, transparent 2%, black 18%, black 82%, transparent);
+      }
+
+      .background-slash {
+        position: absolute;
+        z-index: -4;
+        top: -24%;
+        right: 8%;
+        width: 2px;
+        height: 150%;
+        opacity: 0.28;
+        transform: rotate(28deg);
+        background: linear-gradient(
+          to bottom,
+          transparent 0%,
+          rgba(237, 28, 36, 0.2) 20%,
+          rgba(237, 28, 36, 0.95) 48%,
+          rgba(237, 28, 36, 0.12) 75%,
+          transparent 100%
+        );
+        box-shadow:
+          92px 0 rgba(237, 28, 36, 0.08),
+          -210px 0 rgba(255, 255, 255, 0.025);
+      }
+
+      .ambient {
+        position: absolute;
+        z-index: -3;
+        border-radius: 50%;
+        filter: blur(110px);
+        opacity: 0.14;
+        will-change: transform;
+      }
+
+      .ambient-one {
+        width: 520px;
+        height: 520px;
+        top: 80px;
+        right: -180px;
+        background: var(--red);
+      }
+
+      .ambient-two {
+        width: 400px;
+        height: 400px;
+        bottom: -180px;
+        left: 360px;
+        background: var(--cyan);
+        opacity: 0.07;
+      }
+
+      .brandbar {
+        position: absolute;
+        z-index: 30;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 96px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 72px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        background: linear-gradient(to bottom, rgba(5, 5, 6, 0.97), rgba(5, 5, 6, 0.7));
+      }
+
+      .brand-left,
+      .brand-right,
+      .footer-flow,
+      .model-location,
+      .live-pill,
+      .mission-tags,
+      .call-meta,
+      .signal-row,
+      .artifact-files,
+      .token-counts,
+      .cta-flow {
+        display: flex;
+        align-items: center;
+      }
+
+      .brand-left {
+        gap: 22px;
+      }
+
+      .amd-logo {
+        width: 158px;
+        height: auto;
+        display: block;
+      }
+
+      .brand-rule {
+        width: 1px;
+        height: 34px;
+        background: rgba(255, 255, 255, 0.22);
+      }
+
+      .brand-copy small,
+      .eyebrow,
+      .mini-label,
+      .role-label,
+      .event-kind,
+      .cost-kicker,
+      .live-kicker {
+        display: block;
+        color: var(--red-bright);
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.17em;
+        text-transform: uppercase;
+      }
+
+      .brand-copy strong {
+        display: block;
+        margin-top: 3px;
+        font-size: 20px;
+        letter-spacing: -0.01em;
+      }
+
+      .brand-right {
+        gap: 16px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .live-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 0 6px rgba(86, 216, 144, 0.1);
+      }
+
+      .time-code {
+        min-width: 54px;
+        color: white;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .progress-track {
+        position: absolute;
+        z-index: 31;
+        top: 94px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: rgba(255, 255, 255, 0.055);
+      }
+
+      .progress-fill {
+        display: block;
+        width: 0;
+        height: 100%;
+        transform-origin: left center;
+        background: linear-gradient(90deg, var(--red), var(--red-bright), #ff9b55);
+        box-shadow: 0 0 14px rgba(237, 28, 36, 0.65);
+      }
+
+      .scene {
+        position: absolute;
+        z-index: 5;
+        inset: 118px 82px 76px;
+        opacity: 0;
+        visibility: hidden;
+        will-change: opacity, transform;
+      }
+
+      .scene-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 40px;
+        margin-bottom: 28px;
+      }
+
+      .scene-heading h2 {
+        margin: 5px 0 0;
+        max-width: 1200px;
+        font-size: 54px;
+        line-height: 0.98;
+        letter-spacing: -0.045em;
+      }
+
+      .scene-heading p {
+        max-width: 520px;
+        margin: 0 0 3px;
+        color: var(--muted);
+        font-size: 20px;
+        line-height: 1.42;
+        text-align: right;
+      }
+
+      .red {
+        color: var(--red-bright);
+      }
+
+      .muted {
+        color: var(--muted);
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background:
+          linear-gradient(145deg, rgba(255, 255, 255, 0.035), transparent 45%),
+          var(--panel);
+        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.42);
+      }
+
+      .footer-flow {
+        position: absolute;
+        z-index: 25;
+        left: 72px;
+        right: 72px;
+        bottom: 22px;
+        justify-content: space-between;
+        color: #9fa6b0;
+        font-size: 13px;
+        font-weight: 750;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .footer-flow .flow-main {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .footer-flow .arrow,
+      .cta-flow .arrow {
+        color: var(--red-bright);
+      }
+
+      .scope-short {
+        color: #777e88;
+        font-size: 11px;
+      }
+
+      /* Hook */
+      .hook-layout {
+        display: grid;
+        grid-template-columns: 1.16fr 0.84fr;
+        align-items: center;
+        height: 100%;
+        gap: 46px;
+      }
+
+      .hook-copy {
+        padding-left: 18px;
+      }
+
+      .hook-copy .eyebrow {
+        margin-bottom: 24px;
+      }
+
+      .hook-line {
+        position: relative;
+        width: max-content;
+        margin: 0;
+        font-size: clamp(68px, 6.2vw, 120px);
+        font-weight: 900;
+        line-height: 0.88;
+        letter-spacing: -0.065em;
+        text-transform: uppercase;
+        opacity: 0;
+        will-change: opacity, transform;
+      }
+
+      .hook-line.outline {
+        color: transparent;
+        -webkit-text-stroke: 2px rgba(255, 255, 255, 0.88);
+      }
+
+      .hook-line.route-live {
+        color: var(--red-bright);
+      }
+
+      .hook-subtitle {
+        margin: 34px 0 0;
+        color: var(--muted);
+        font-size: 24px;
+        font-weight: 650;
+        opacity: 0;
+      }
+
+      .hook-system {
+        position: relative;
+        height: 640px;
+        opacity: 0;
+      }
+
+      .hook-router {
+        position: absolute;
+        z-index: 3;
+        top: 50%;
+        left: 50%;
+        width: 184px;
+        height: 184px;
+        display: grid;
+        place-items: center;
+        transform: translate(-50%, -50%);
+        border: 1px solid rgba(237, 28, 36, 0.68);
+        border-radius: 50%;
+        background:
+          radial-gradient(circle, rgba(237, 28, 36, 0.26), rgba(15, 16, 19, 0.98) 64%);
+        box-shadow:
+          0 0 0 22px rgba(237, 28, 36, 0.055),
+          0 0 85px rgba(237, 28, 36, 0.2);
+      }
+
+      .hook-router img,
+      .router-core img {
+        width: 55px;
+        height: auto;
+        filter: drop-shadow(0 0 18px rgba(237, 28, 36, 0.42));
+      }
+
+      .hook-router span {
+        position: absolute;
+        bottom: 35px;
+        color: white;
+        font-size: 11px;
+        font-weight: 850;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .hook-model {
+        position: absolute;
+        z-index: 4;
+        width: 256px;
+        padding: 17px 18px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        border-left: 4px solid var(--model-color);
+        border-radius: 14px;
+        background: rgba(18, 19, 22, 0.94);
+        box-shadow: 0 22px 48px rgba(0, 0, 0, 0.3);
+      }
+
+      .hook-model strong,
+      .route-model-card strong {
+        display: block;
+        font-size: 20px;
+        letter-spacing: -0.02em;
+      }
+
+      .hook-model small,
+      .route-model-card small {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .hook-qwen {
+        top: 72px;
+        right: 0;
+      }
+
+      .hook-glm {
+        top: 270px;
+        right: 92px;
+      }
+
+      .hook-kimi {
+        right: 0;
+        bottom: 66px;
+      }
+
+      .hook-lines {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+      }
+
+      .hook-lines path {
+        fill: none;
+        stroke-width: 2;
+        stroke-linecap: round;
+        opacity: 0.62;
+      }
+
+      /* Mission */
+      .mission-layout {
+        display: grid;
+        grid-template-columns: 0.88fr 1.12fr;
+        align-items: center;
+        gap: 74px;
+        height: 100%;
+      }
+
+      .mission-intro h2 {
+        margin: 12px 0 22px;
+        font-size: 72px;
+        line-height: 0.94;
+        letter-spacing: -0.055em;
+      }
+
+      .mission-intro p {
+        max-width: 610px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 22px;
+        line-height: 1.5;
+      }
+
+      .mission-card {
+        position: relative;
+        min-height: 600px;
+        padding: 42px;
+        overflow: hidden;
+      }
+
+      .mission-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 7px;
+        height: 100%;
+        background: linear-gradient(var(--red), var(--red-bright), transparent);
+      }
+
+      .mission-number {
+        position: absolute;
+        top: 30px;
+        right: 34px;
+        color: rgba(255, 255, 255, 0.055);
+        font-size: 124px;
+        font-weight: 900;
+        line-height: 1;
+      }
+
+      .mission-card h3 {
+        position: relative;
+        max-width: 720px;
+        margin: 18px 0 26px;
+        font-size: 47px;
+        line-height: 1.03;
+        letter-spacing: -0.045em;
+      }
+
+      .prompt-window {
+        position: relative;
+        min-height: 158px;
+        padding: 24px 26px;
+        border: 1px solid #3a3d44;
+        border-radius: 15px;
+        background: #0d0e11;
+      }
+
+      .prompt-window .prompt-label {
+        display: block;
+        margin-bottom: 12px;
+        color: #7f8792;
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+      }
+
+      .typed-prompt {
+        color: #e7e9ec;
+        font-size: 18px;
+        line-height: 1.5;
+      }
+
+      .cursor {
+        display: inline-block;
+        width: 9px;
+        height: 21px;
+        margin-left: 3px;
+        vertical-align: -3px;
+        background: var(--red-bright);
+      }
+
+      .mission-tags {
+        flex-wrap: wrap;
+        gap: 9px;
+        margin-top: 22px;
+      }
+
+      .chip,
+      .mission-tags span {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 6px 11px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 999px;
+        color: #c9ced5;
+        background: rgba(255, 255, 255, 0.035);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+
+      .run-button {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        width: 100%;
+        margin-top: 30px;
+        padding: 20px 24px;
+        border-radius: 12px;
+        background: var(--red);
+        color: white;
+        font-size: 18px;
+        font-weight: 850;
+        letter-spacing: 0.05em;
+        box-shadow: 0 18px 46px rgba(237, 28, 36, 0.2);
+      }
+
+      .run-button b {
+        font-size: 28px;
+      }
+
+      /* Delegation */
+      .delegation-canvas {
+        position: relative;
+        height: 620px;
+        margin-top: 8px;
+      }
+
+      .delegation-lines {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .delegation-lines path {
+        fill: none;
+        stroke: rgba(237, 28, 36, 0.86);
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-dasharray: 620;
+        stroke-dashoffset: 620;
+        filter: drop-shadow(0 0 8px rgba(237, 28, 36, 0.35));
+      }
+
+      .agent-card {
+        position: absolute;
+        width: 310px;
+        min-height: 170px;
+        padding: 24px;
+        border: 1px solid #3a3d44;
+        border-radius: 18px;
+        background: rgba(19, 20, 24, 0.97);
+        box-shadow: 0 24px 55px rgba(0, 0, 0, 0.3);
+        opacity: 0;
+      }
+
+      .agent-card.coordinator {
+        top: 178px;
+        left: 78px;
+        width: 360px;
+        min-height: 210px;
+        border-color: rgba(237, 28, 36, 0.65);
+        background:
+          radial-gradient(circle at 10% 0%, rgba(237, 28, 36, 0.16), transparent 46%),
+          rgba(19, 20, 24, 0.98);
+      }
+
+      .agent-card.researcher {
+        top: 24px;
+        right: 80px;
+      }
+
+      .agent-card.builder {
+        top: 225px;
+        right: 24px;
+      }
+
+      .agent-card.reviewer {
+        right: 80px;
+        bottom: 0;
+      }
+
+      .agent-card .agent-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .agent-card .agent-status-dot {
+        width: 11px;
+        height: 11px;
+        border-radius: 50%;
+        background: #5d626a;
+        box-shadow: 0 0 0 6px rgba(255, 255, 255, 0.04);
+      }
+
+      .agent-card.active .agent-status-dot {
+        background: var(--green);
+        box-shadow: 0 0 0 6px rgba(86, 216, 144, 0.09);
+      }
+
+      .agent-card h3 {
+        margin: 22px 0 5px;
+        font-size: 29px;
+        letter-spacing: -0.03em;
+      }
+
+      .agent-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 15px;
+        line-height: 1.35;
+      }
+
+      .agent-card .agent-state {
+        display: block;
+        margin-top: 20px;
+        color: #d9dde2;
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.07em;
+        text-transform: uppercase;
+      }
+
+      /* Routing */
+      .routing-stage {
+        position: relative;
+        height: 645px;
+        overflow: hidden;
+        border: 1px solid rgba(255, 255, 255, 0.07);
+        border-radius: 24px;
+        background:
+          linear-gradient(90deg, rgba(237, 28, 36, 0.035), transparent 37%),
+          rgba(9, 10, 12, 0.73);
+      }
+
+      .route-call {
+        position: absolute;
+        z-index: 4;
+        top: 147px;
+        left: 44px;
+        width: 470px;
+        min-height: 355px;
+        padding: 30px;
+      }
+
+      .call-meta {
+        justify-content: space-between;
+        gap: 12px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .call-sequence {
+        color: white;
+      }
+
+      .route-call h3 {
+        margin: 25px 0 10px;
+        font-size: 35px;
+        line-height: 1.04;
+        letter-spacing: -0.04em;
+      }
+
+      .route-decision {
+        margin-top: 26px;
+        color: var(--red-bright);
+        font-size: 12px;
+        font-weight: 850;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .route-effort {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 10px;
+      }
+
+      .route-effort strong {
+        font-size: 20px;
+      }
+
+      .effort-bars {
+        display: flex;
+        align-items: flex-end;
+        gap: 5px;
+        height: 32px;
+      }
+
+      .effort-bars i {
+        display: block;
+        width: 10px;
+        height: calc(8px + var(--index) * 5px);
+        border-radius: 2px;
+        background: #41454d;
+      }
+
+      .effort-bars i.on {
+        background: var(--route-color, var(--red));
+        box-shadow: 0 0 10px color-mix(in srgb, var(--route-color, var(--red)) 54%, transparent);
+      }
+
+      .signal-row {
+        flex-wrap: wrap;
+        gap: 7px;
+        margin-top: 22px;
+      }
+
+      .signal-row .chip {
+        font-size: 10px;
+      }
+
+      .router-core {
+        position: absolute;
+        z-index: 5;
+        top: 208px;
+        left: 728px;
+        width: 215px;
+        height: 215px;
+        display: grid;
+        place-items: center;
+        border: 1px solid rgba(237, 28, 36, 0.62);
+        border-radius: 50%;
+        background:
+          radial-gradient(circle, rgba(237, 28, 36, 0.22), rgba(13, 14, 17, 0.99) 67%);
+        box-shadow:
+          0 0 0 18px rgba(237, 28, 36, 0.045),
+          0 0 70px rgba(237, 28, 36, 0.16);
+      }
+
+      .router-core strong {
+        position: absolute;
+        bottom: 46px;
+        font-size: 12px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .router-core small {
+        position: absolute;
+        bottom: 28px;
+        color: var(--muted);
+        font-size: 10px;
+      }
+
+      .route-lines {
+        position: absolute;
+        z-index: 2;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+      }
+
+      .route-lines path {
+        fill: none;
+        stroke: #3a3d44;
+        stroke-width: 3;
+        stroke-linecap: round;
+        stroke-dasharray: 760;
+        stroke-dashoffset: 760;
+      }
+
+      .route-lines .call-line {
+        stroke: var(--red);
+        opacity: 0.75;
+      }
+
+      .model-stack {
+        position: absolute;
+        z-index: 4;
+        top: 44px;
+        right: 42px;
+        width: 430px;
+        display: grid;
+        gap: 15px;
+      }
+
+      .route-model-card {
+        position: relative;
+        min-height: 156px;
+        padding: 24px 26px 21px 29px;
+        overflow: hidden;
+        border: 1px solid #34373d;
+        border-radius: 17px;
+        background: rgba(18, 19, 22, 0.97);
+        transform-origin: right center;
+      }
+
+      .route-model-card::before {
+        content: "";
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 5px;
+        background: var(--model-color);
+      }
+
+      .route-model-card.selected {
+        border-color: color-mix(in srgb, var(--model-color) 75%, white 8%);
+        background:
+          radial-gradient(circle at 98% 0%, color-mix(in srgb, var(--model-color) 17%, transparent), transparent 58%),
+          rgba(21, 22, 26, 0.99);
+        box-shadow: 0 0 38px color-mix(in srgb, var(--model-color) 18%, transparent);
+      }
+
+      .model-location {
+        justify-content: space-between;
+        margin-top: 17px;
+      }
+
+      .model-location span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .route-count {
+        padding: 5px 9px;
+        border-radius: 99px;
+        color: white !important;
+        background: rgba(255, 255, 255, 0.07);
+        font-weight: 800;
+      }
+
+      .route-summary {
+        position: absolute;
+        z-index: 4;
+        left: 50%;
+        bottom: 26px;
+        transform: translateX(-50%);
+        padding: 10px 17px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 999px;
+        color: #d6dae0;
+        background: rgba(5, 5, 6, 0.78);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      /* Intelligence */
+      .intelligence-layout {
+        display: grid;
+        grid-template-columns: 1.18fr 0.82fr;
+        gap: 26px;
+        height: 650px;
+      }
+
+      .route-intelligence-card {
+        position: relative;
+        padding: 34px;
+        border-color: var(--intel-color, var(--orange));
+        overflow: hidden;
+      }
+
+      .route-intelligence-card::after {
+        content: "";
+        position: absolute;
+        inset: -180px -130px auto auto;
+        width: 420px;
+        height: 420px;
+        border-radius: 50%;
+        background: var(--intel-color, var(--orange));
+        filter: blur(120px);
+        opacity: 0.12;
+      }
+
+      .route-card-top {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+
+      .selected-model {
+        margin: 9px 0 3px;
+        font-size: 42px;
+        line-height: 1;
+        letter-spacing: -0.04em;
+      }
+
+      .selected-location {
+        color: var(--muted);
+        font-size: 14px;
+      }
+
+      .decision-pill {
+        padding: 9px 12px;
+        border: 1px solid color-mix(in srgb, var(--intel-color, var(--orange)) 60%, transparent);
+        border-radius: 8px;
+        color: var(--intel-color, var(--orange));
+        background: color-mix(in srgb, var(--intel-color, var(--orange)) 9%, transparent);
+        font-size: 11px;
+        font-weight: 850;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .why-route {
+        position: relative;
+        z-index: 2;
+        margin-top: 34px;
+        padding: 24px;
+        border: 1px solid rgba(255, 255, 255, 0.09);
+        border-radius: 14px;
+        background: rgba(4, 5, 7, 0.45);
+      }
+
+      .why-route strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 14px;
+      }
+
+      .why-route p {
+        margin: 0;
+        color: #c1c6ce;
+        font-size: 18px;
+        line-height: 1.42;
+      }
+
+      .intel-signal-groups {
+        position: relative;
+        z-index: 2;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 11px;
+        margin-top: 22px;
+      }
+
+      .intel-signal {
+        min-height: 102px;
+        padding: 15px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.025);
+      }
+
+      .intel-signal span {
+        display: block;
+        color: #767e88;
+        font-size: 9px;
+        font-weight: 850;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .intel-signal strong {
+        display: block;
+        margin-top: 12px;
+        font-size: 15px;
+        line-height: 1.25;
+      }
+
+      .reasoning-panel {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-top: 25px;
+        padding: 20px 23px;
+        border-radius: 14px;
+        background: rgba(0, 0, 0, 0.28);
+      }
+
+      .reasoning-panel span {
+        display: block;
+        color: #858c96;
+        font-size: 10px;
+        font-weight: 850;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+      }
+
+      .reasoning-panel strong {
+        display: block;
+        margin-top: 4px;
+        font-size: 26px;
+      }
+
+      .reasoning-panel .effort-bars {
+        height: 45px;
+        gap: 8px;
+      }
+
+      .reasoning-panel .effort-bars i {
+        width: 18px;
+        height: calc(12px + var(--index) * 7px);
+      }
+
+      .event-stream {
+        display: flex;
+        flex-direction: column;
+        gap: 13px;
+      }
+
+      .event-card {
+        position: relative;
+        flex: 1;
+        min-height: 0;
+        padding: 20px 22px;
+        overflow: hidden;
+        opacity: 0;
+      }
+
+      .event-card::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 3px;
+        height: 100%;
+        background: var(--event-color, var(--red));
+      }
+
+      .event-card .event-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .event-card .event-time {
+        color: #6f7680;
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .event-card h4 {
+        margin: 12px 0 4px;
+        font-size: 18px;
+      }
+
+      .event-card p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.35;
+      }
+
+      .visible-badge {
+        align-self: center;
+        padding: 12px 18px;
+        border: 1px solid rgba(86, 216, 144, 0.38);
+        border-radius: 999px;
+        color: #b7f7d3;
+        background: rgba(86, 216, 144, 0.07);
+        font-size: 11px;
+        font-weight: 850;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      /* Cost */
+      .cost-layout {
+        display: grid;
+        grid-template-columns: 0.72fr 1.28fr;
+        align-items: center;
+        gap: 68px;
+        height: 100%;
+      }
+
+      .cost-copy h2 {
+        margin: 16px 0 22px;
+        font-size: 70px;
+        line-height: 0.95;
+        letter-spacing: -0.055em;
+      }
+
+      .cost-copy p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 20px;
+        line-height: 1.5;
+      }
+
+      .cost-card {
+        padding: 38px 42px 32px;
+      }
+
+      .token-counts {
+        justify-content: space-between;
+        margin-bottom: 24px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      }
+
+      .token-counts span {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .token-counts strong {
+        color: white;
+        font-size: 16px;
+      }
+
+      .cost-row {
+        margin-top: 26px;
+      }
+
+      .cost-row-top {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        margin-bottom: 10px;
+      }
+
+      .cost-row-top span {
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .cost-row-top strong {
+        font-size: 29px;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .cost-track {
+        height: 22px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #24262b;
+      }
+
+      .cost-bar {
+        width: 0;
+        height: 100%;
+        border-radius: inherit;
+      }
+
+      .cost-bar.routed {
+        background: linear-gradient(90deg, var(--red), var(--orange));
+        box-shadow: 0 0 20px rgba(237, 28, 36, 0.3);
+      }
+
+      .cost-bar.kimi {
+        background: linear-gradient(90deg, #78683f, var(--gold));
+        box-shadow: 0 0 20px rgba(215, 189, 116, 0.22);
+      }
+
+      .savings-block {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 30px;
+        margin-top: 34px;
+        padding: 24px 26px;
+        border: 1px solid rgba(86, 216, 144, 0.28);
+        border-radius: 16px;
+        background: rgba(86, 216, 144, 0.055);
+        opacity: 0;
+      }
+
+      .savings-block span {
+        color: #b4bdc6;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      .savings-block strong {
+        color: var(--green);
+        font-size: 49px;
+        letter-spacing: -0.04em;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .cost-scope {
+        margin: 24px 0 0;
+        color: #8c939d;
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .cost-scope b {
+        color: #d9dde2;
+      }
+
+      /* Artifacts */
+      .artifact-layout {
+        display: grid;
+        grid-template-columns: 1.2fr 0.8fr;
+        gap: 30px;
+        height: 640px;
+      }
+
+      .browser-artifact {
+        position: relative;
+        overflow: hidden;
+        opacity: 0;
+      }
+
+      .browser-chrome {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        height: 48px;
+        padding: 0 17px;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        background: #181a1e;
+      }
+
+      .browser-dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: #555a62;
+      }
+
+      .address {
+        flex: 1;
+        height: 27px;
+        margin-left: 10px;
+        padding: 6px 13px;
+        border-radius: 7px;
+        color: #89919b;
+        background: #0d0e11;
+        font-size: 10px;
+      }
+
+      .artifact-preview {
+        height: calc(100% - 48px);
+        padding: 32px;
+        background:
+          radial-gradient(circle at 82% 0%, rgba(237, 28, 36, 0.14), transparent 35%),
+          linear-gradient(145deg, #08090b, #101217);
+      }
+
+      .artifact-preview-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .artifact-preview-head img {
+        width: 108px;
+        height: auto;
+      }
+
+      .artifact-preview-head span {
+        color: #8d949e;
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .artifact-preview h3 {
+        max-width: 650px;
+        margin: 48px 0 14px;
+        font-size: 43px;
+        line-height: 1.03;
+        letter-spacing: -0.045em;
+      }
+
+      .artifact-preview > p {
+        max-width: 620px;
+        margin: 0;
+        color: #aab1bb;
+        font-size: 15px;
+        line-height: 1.5;
+      }
+
+      .accelerator-cards {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 15px;
+        margin-top: 34px;
+      }
+
+      .accelerator-card {
+        min-height: 172px;
+        padding: 21px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 13px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .accelerator-card b {
+        display: block;
+        color: var(--red-bright);
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .accelerator-card strong {
+        display: block;
+        margin-top: 9px;
+        font-size: 27px;
+      }
+
+      .accelerator-card span {
+        display: block;
+        margin-top: 42px;
+        color: #a8afb8;
+        font-size: 12px;
+      }
+
+      .artifact-side {
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+      }
+
+      .artifact-file,
+      .review-check {
+        opacity: 0;
+      }
+
+      .artifact-file {
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        min-height: 83px;
+        padding: 18px 20px;
+      }
+
+      .file-icon {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 10px;
+        color: var(--red-bright);
+        background: rgba(237, 28, 36, 0.1);
+        font-size: 13px;
+        font-weight: 900;
+      }
+
+      .artifact-file strong {
+        display: block;
+        font-size: 16px;
+      }
+
+      .artifact-file small {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .review-panel {
+        flex: 1;
+        padding: 23px;
+      }
+
+      .review-panel h3 {
+        margin: 8px 0 18px;
+        font-size: 23px;
+      }
+
+      .review-check {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 13px;
+        color: #dbe0e5;
+        font-size: 14px;
+      }
+
+      .review-check i {
+        display: grid;
+        place-items: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        color: #08130d;
+        background: var(--green);
+        font-style: normal;
+        font-size: 14px;
+        font-weight: 900;
+      }
+
+      /* CTA */
+      .cta {
+        inset: 0;
+        display: grid;
+        place-items: center;
+        text-align: center;
+        background:
+          radial-gradient(circle at 50% 45%, rgba(237, 28, 36, 0.16), transparent 36%),
+          linear-gradient(145deg, rgba(5, 5, 6, 0.3), rgba(5, 5, 6, 0.92));
+      }
+
+      .cta-content {
+        width: min(1450px, 84vw);
+      }
+
+      .cta-lockup {
+        width: 380px;
+        height: auto;
+        margin-bottom: 37px;
+        opacity: 0;
+      }
+
+      .cta h2 {
+        margin: 0;
+        font-size: 94px;
+        line-height: 0.92;
+        letter-spacing: -0.06em;
+        opacity: 0;
+      }
+
+      .cta-subtitle {
+        margin: 27px 0 0;
+        color: #c0c5cc;
+        font-size: 24px;
+        opacity: 0;
+      }
+
+      .live-pill {
+        width: max-content;
+        gap: 12px;
+        margin: 37px auto 0;
+        padding: 13px 20px;
+        border: 1px solid rgba(237, 28, 36, 0.48);
+        border-radius: 999px;
+        color: white;
+        background: rgba(237, 28, 36, 0.09);
+        font-size: 15px;
+        font-weight: 900;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        opacity: 0;
+      }
+
+      .live-pill .live-dot {
+        background: var(--red-bright);
+        box-shadow: 0 0 0 7px rgba(237, 28, 36, 0.11);
+      }
+
+      .cta-flow {
+        justify-content: center;
+        gap: 18px;
+        margin-top: 43px;
+        color: #959ca6;
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        opacity: 0;
+      }
+
+      .cta-chevron {
+        position: absolute;
+        right: 94px;
+        bottom: 72px;
+        width: 72px;
+        height: auto;
+        opacity: 0.2;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage">
+      <div class="background-grid" aria-hidden="true"></div>
+      <div class="background-slash" aria-hidden="true"></div>
+      <div class="ambient ambient-one" id="ambient-one" aria-hidden="true"></div>
+      <div class="ambient ambient-two" id="ambient-two" aria-hidden="true"></div>
+
+      <header class="brandbar" id="brandbar">
+        <div class="brand-left">
+          <img
+            class="amd-logo"
+            src="../control/static/amd-logo-white.png"
+            alt="AMD"
+          />
+          <span class="brand-rule" aria-hidden="true"></span>
+          <div class="brand-copy">
+            <small>AMD INSTINCT™ AI EXPERIENCE</small>
+            <strong>Open Agent Studio</strong>
+          </div>
+        </div>
+        <div class="brand-right">
+          <span class="live-dot" id="header-live-dot" aria-hidden="true"></span>
+          <span>Live system</span>
+          <span>·</span>
+          <span>60 sec demo loop</span>
+          <span class="time-code" id="time-code">00:00</span>
+        </div>
+      </header>
+      <div class="progress-track" id="progress-track" aria-hidden="true">
+        <span class="progress-fill" id="progress-fill"></span>
+      </div>
+
+      <main>
+        <section class="scene hook" id="scene-hook" aria-label="One mission, three models">
+          <div class="hook-layout">
+            <div class="hook-copy">
+              <span class="eyebrow" id="hook-eyebrow">LIVE AI AGENT ROUTING</span>
+              <h1 class="hook-line" id="hook-one">ONE MISSION.</h1>
+              <h1 class="hook-line outline" id="hook-three">THREE MODELS.</h1>
+              <h1 class="hook-line route-live" id="hook-routed">ROUTED LIVE.</h1>
+              <p class="hook-subtitle" id="hook-subtitle">
+                OpenClaw <span class="red">→</span> vLLM Semantic Router
+              </p>
+            </div>
+            <div class="hook-system" id="hook-system" aria-hidden="true">
+              <svg class="hook-lines" viewBox="0 0 760 640" preserveAspectRatio="none">
+                <path d="M365 320 C470 270 525 120 650 120" stroke="#ed1c24"></path>
+                <path d="M365 320 C470 320 510 320 605 320" stroke="#ff6a00"></path>
+                <path d="M365 320 C470 375 525 520 650 520" stroke="#d7bd74"></path>
+              </svg>
+              <div class="hook-router" id="hook-router">
+                <img src="../control/static/amd-chevron.png" alt="" />
+                <span>Semantic router</span>
+              </div>
+              <div class="hook-model hook-qwen" style="--model-color: #ed1c24">
+                <strong>Qwen3.8-27B</strong>
+                <small>Local · AMD MI300X</small>
+              </div>
+              <div class="hook-model hook-glm" style="--model-color: #ff6a00">
+                <strong>GLM-5.3-Flash</strong>
+                <small>Fireworks · Serverless</small>
+              </div>
+              <div class="hook-model hook-kimi" style="--model-color: #d7bd74">
+                <strong>Kimi K3</strong>
+                <small>Fireworks · Premium</small>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="scene mission" id="scene-mission" aria-label="Live demo mission">
+          <div class="mission-layout">
+            <div class="mission-intro">
+              <span class="eyebrow" id="mission-eyebrow">LIVE DEMO MISSION</span>
+              <h2 id="mission-title">GIVE OPENCLAW<br />REAL WORK.</h2>
+              <p id="mission-copy">
+                One useful mission. Multiple specialists. The right model for every call.
+              </p>
+            </div>
+            <article class="mission-card panel" id="mission-card">
+              <span class="mission-number">01</span>
+              <span class="mini-label">VISITOR TASK</span>
+              <h3>Build an AMD accelerator microsite</h3>
+              <div class="prompt-window">
+                <span class="prompt-label">MISSION</span>
+                <span class="typed-prompt" id="typed-prompt"></span><span class="cursor" id="prompt-cursor"></span>
+              </div>
+              <div class="mission-tags" id="mission-tags">
+                <span>Primary sources</span>
+                <span>Self-contained HTML</span>
+                <span>Citations</span>
+                <span>Review</span>
+              </div>
+              <div class="run-button" id="run-button">
+                <span>RUN AGENT</span>
+                <b>→</b>
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="scene delegation" id="scene-delegation" aria-label="OpenClaw delegation">
+          <div class="scene-heading">
+            <div>
+              <span class="eyebrow">OPENCLAW ORCHESTRATION</span>
+              <h2 id="delegation-title">OPENCLAW DELEGATES.</h2>
+            </div>
+            <p id="delegation-copy">One mission becomes specialized work—with one coordinator keeping the result coherent.</p>
+          </div>
+          <div class="delegation-canvas">
+            <svg class="delegation-lines" viewBox="0 0 1756 620" preserveAspectRatio="none" aria-hidden="true">
+              <path id="delegate-line-researcher" d="M438 280 C690 280 950 105 1365 105"></path>
+              <path id="delegate-line-builder" d="M438 280 C730 280 1010 307 1420 307"></path>
+              <path id="delegate-line-reviewer" d="M438 280 C690 300 950 520 1365 520"></path>
+            </svg>
+            <article class="agent-card coordinator" id="agent-coordinator">
+              <div class="agent-top">
+                <span class="role-label">MAIN AGENT</span>
+                <span class="agent-status-dot"></span>
+              </div>
+              <h3>Coordinator</h3>
+              <p>Plans the mission, delegates work, and assembles the final response.</p>
+              <span class="agent-state" id="state-coordinator">Breaking down mission…</span>
+            </article>
+            <article class="agent-card researcher" id="agent-researcher">
+              <div class="agent-top">
+                <span class="role-label">SUBAGENT</span>
+                <span class="agent-status-dot"></span>
+              </div>
+              <h3>Researcher</h3>
+              <p>Primary sources, facts, and citations.</p>
+              <span class="agent-state" id="state-researcher">Queued</span>
+            </article>
+            <article class="agent-card builder" id="agent-builder">
+              <div class="agent-top">
+                <span class="role-label">SUBAGENT</span>
+                <span class="agent-status-dot"></span>
+              </div>
+              <h3>Builder</h3>
+              <p>HTML, interaction, and browser-ready artifacts.</p>
+              <span class="agent-state" id="state-builder">Queued</span>
+            </article>
+            <article class="agent-card reviewer" id="agent-reviewer">
+              <div class="agent-top">
+                <span class="role-label">SUBAGENT</span>
+                <span class="agent-status-dot"></span>
+              </div>
+              <h3>Reviewer</h3>
+              <p>Correctness, clarity, and final verification.</p>
+              <span class="agent-state" id="state-reviewer">Waiting for artifact</span>
+            </article>
+          </div>
+        </section>
+
+        <section class="scene routing" id="scene-routing" aria-label="Live model routing">
+          <div class="scene-heading">
+            <div>
+              <span class="eyebrow">VLLM SEMANTIC ROUTER</span>
+              <h2>ONE ENDPOINT. <span class="red">RIGHT MODEL.</span> EVERY CALL.</h2>
+            </div>
+            <p>The pool stays fixed. The route changes with the work, conversation, and requested effort.</p>
+          </div>
+          <div class="routing-stage">
+            <svg class="route-lines" viewBox="0 0 1756 645" preserveAspectRatio="none" aria-hidden="true">
+              <path class="call-line" id="route-call-line" d="M514 323 C600 323 660 323 728 323"></path>
+              <path id="route-line-qwen" d="M943 315 C1085 280 1125 118 1284 118"></path>
+              <path id="route-line-glm" d="M943 315 C1085 315 1140 322 1284 322"></path>
+              <path id="route-line-kimi" d="M943 315 C1085 355 1125 525 1284 525"></path>
+            </svg>
+
+            <article class="route-call panel">
+              <div class="call-meta">
+                <span id="route-agent">COORDINATOR · PLAN</span>
+                <span class="call-sequence" id="route-sequence">CALL 01</span>
+              </div>
+              <h3 id="route-request">Plan the mission and assign specialists.</h3>
+              <div class="route-decision" id="route-decision">EVERYDAY REASONING</div>
+              <div class="route-effort">
+                <strong id="route-effort-label">MEDIUM EFFORT</strong>
+                <div class="effort-bars" id="route-effort-bars" aria-label="Reasoning effort">
+                  <i style="--index: 0"></i>
+                  <i style="--index: 1"></i>
+                  <i style="--index: 2"></i>
+                  <i style="--index: 3"></i>
+                  <i style="--index: 4"></i>
+                </div>
+              </div>
+              <div class="signal-row">
+                <span class="chip" id="route-signal-one">Analysis task</span>
+                <span class="chip" id="route-signal-two">Effort medium</span>
+                <span class="chip" id="route-signal-three">Standard path</span>
+              </div>
+            </article>
+
+            <div class="router-core" id="router-core">
+              <img src="../control/static/amd-chevron.png" alt="" />
+              <strong>One endpoint</strong>
+              <small>vLLM Semantic Router</small>
+            </div>
+
+            <div class="model-stack">
+              <article class="route-model-card" id="route-qwen" style="--model-color: #ed1c24">
+                <strong>Qwen3.8-27B FP8</strong>
+                <small>Fast, standard, and visual work</small>
+                <div class="model-location">
+                  <span>Local · AMD MI300X</span>
+                  <span class="route-count">2 calls</span>
+                </div>
+              </article>
+              <article class="route-model-card" id="route-glm" style="--model-color: #ff6a00">
+                <strong>GLM-5.3-Flash</strong>
+                <small>Tools, code, facts, and agent loops</small>
+                <div class="model-location">
+                  <span>Fireworks · Serverless</span>
+                  <span class="route-count">2 calls</span>
+                </div>
+              </article>
+              <article class="route-model-card" id="route-kimi" style="--model-color: #d7bd74">
+                <strong>Kimi K3</strong>
+                <small>Frontier reasoning and recovery</small>
+                <div class="model-location">
+                  <span>Fireworks · Premium</span>
+                  <span class="route-count">1 call</span>
+                </div>
+              </article>
+            </div>
+            <div class="route-summary" id="route-summary">
+              QWEN ×2 &nbsp;·&nbsp; GLM ×2 &nbsp;·&nbsp; KIMI ×1
+            </div>
+          </div>
+        </section>
+
+        <section class="scene intelligence" id="scene-intelligence" aria-label="Routing signals and reasoning effort">
+          <div class="scene-heading">
+            <div>
+              <span class="eyebrow">ROUTING INTELLIGENCE</span>
+              <h2>EVERY ROUTE <span class="red">EXPLAINS ITSELF.</span></h2>
+            </div>
+            <div class="visible-badge" id="visible-badge">● &nbsp; VISIBLE IN REAL TIME</div>
+          </div>
+          <div class="intelligence-layout">
+            <article class="route-intelligence-card panel" id="route-intelligence-card">
+              <div class="route-card-top">
+                <div>
+                  <span class="mini-label">SELECTED MODEL</span>
+                  <h3 class="selected-model" id="intel-model">GLM-5.3-Flash</h3>
+                  <span class="selected-location" id="intel-location">Fireworks · Serverless</span>
+                </div>
+                <span class="decision-pill" id="intel-decision">TOOL ORCHESTRATION</span>
+              </div>
+              <div class="why-route">
+                <strong>Why this route</strong>
+                <p id="intel-explanation">
+                  The request needs browser and tool orchestration, so the router selected the pool’s agentic cloud path.
+                </p>
+              </div>
+              <div class="intel-signal-groups">
+                <div class="intel-signal">
+                  <span>TASK SIGNAL</span>
+                  <strong id="intel-task-signal">Tools needed</strong>
+                </div>
+                <div class="intel-signal">
+                  <span>CONVERSATION SIGNAL</span>
+                  <strong id="intel-conversation-signal">Active tool loop</strong>
+                </div>
+                <div class="intel-signal">
+                  <span>EFFORT SIGNAL</span>
+                  <strong id="intel-effort-signal">Effort high</strong>
+                </div>
+              </div>
+              <div class="reasoning-panel">
+                <div>
+                  <span>ROUTER-REQUESTED REASONING</span>
+                  <strong id="intel-effort-label">HIGH</strong>
+                </div>
+                <div class="effort-bars" id="intel-effort-bars" aria-label="Requested reasoning effort">
+                  <i style="--index: 0"></i>
+                  <i style="--index: 1"></i>
+                  <i style="--index: 2"></i>
+                  <i style="--index: 3"></i>
+                  <i style="--index: 4"></i>
+                </div>
+              </div>
+            </article>
+
+            <div class="event-stream" aria-label="Live event stream">
+              <article class="event-card panel" id="event-one" style="--event-color: #ed1c24">
+                <div class="event-head">
+                  <span class="event-kind">AGENT.DELEGATED</span>
+                  <span class="event-time">00:08.4</span>
+                </div>
+                <h4>Coordinator → Researcher</h4>
+                <p>Primary-source research assigned with an artifact path.</p>
+              </article>
+              <article class="event-card panel" id="event-two" style="--event-color: #ff6a00">
+                <div class="event-head">
+                  <span class="event-kind">ROUTE.SELECTED</span>
+                  <span class="event-time">00:19.1</span>
+                </div>
+                <h4>GLM-5.3-Flash · High</h4>
+                <p>Matched: tools, agentic task, exact facts.</p>
+              </article>
+              <article class="event-card panel" id="event-three" style="--event-color: #00c2de">
+                <div class="event-head">
+                  <span class="event-kind">TOOL.CALLED</span>
+                  <span class="event-time">00:21.8</span>
+                </div>
+                <h4>Browser + primary sources</h4>
+                <p>Research evidence returns to the shared run directory.</p>
+              </article>
+              <article class="event-card panel" id="event-four" style="--event-color: #d7bd74">
+                <div class="event-head">
+                  <span class="event-kind">ROUTE.SELECTED</span>
+                  <span class="event-time">00:24.3</span>
+                </div>
+                <h4>Kimi K3 · Maximum</h4>
+                <p>Frontier review receives the largest reasoning budget.</p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="scene cost" id="scene-cost" aria-label="Illustrative cloud API cost comparison">
+          <div class="cost-layout">
+            <div class="cost-copy">
+              <span class="cost-kicker">EXAMPLE RUN · CLOUD API/TOKEN ESTIMATE</span>
+              <h2>SPEND PREMIUM<br /><span class="red">ONLY WHEN NEEDED.</span></h2>
+              <p>Same example token mix. Different model choices per call.</p>
+            </div>
+            <article class="cost-card panel">
+              <div class="token-counts">
+                <span>Example token mix</span>
+                <span><strong id="prompt-token-count">0</strong> prompt</span>
+                <span><strong id="output-token-count">0</strong> output</span>
+              </div>
+              <div class="cost-row">
+                <div class="cost-row-top">
+                  <span>Routed cloud API estimate</span>
+                  <strong id="routed-cost">$0.00000</strong>
+                </div>
+                <div class="cost-track">
+                  <div class="cost-bar routed" id="routed-cost-bar"></div>
+                </div>
+              </div>
+              <div class="cost-row">
+                <div class="cost-row-top">
+                  <span>All-Kimi same-token estimate</span>
+                  <strong id="kimi-cost">$0.00000</strong>
+                </div>
+                <div class="cost-track">
+                  <div class="cost-bar kimi" id="kimi-cost-bar"></div>
+                </div>
+              </div>
+              <div class="savings-block" id="savings-block">
+                <span>Estimated savings vs all-Kimi</span>
+                <strong id="savings-value">0.0%</strong>
+              </div>
+              <p class="cost-scope" id="cost-scope">
+                <b>Scope:</b> same-token cloud API estimate only. Excludes local AMD Instinct hardware,
+                hosting, power, and operating costs. Illustrative—not a benchmark.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="scene artifacts" id="scene-artifacts" aria-label="Reviewed artifacts">
+          <div class="scene-heading">
+            <div>
+              <span class="eyebrow">CONCRETE OUTPUT</span>
+              <h2>PROMPT IN. <span class="red">REVIEWED ARTIFACTS OUT.</span></h2>
+            </div>
+            <p>Not just an answer: files you can open, inspect, and take with you.</p>
+          </div>
+          <div class="artifact-layout">
+            <article class="browser-artifact panel" id="browser-artifact">
+              <div class="browser-chrome">
+                <span class="browser-dot"></span>
+                <span class="browser-dot"></span>
+                <span class="browser-dot"></span>
+                <span class="address">artifact://amd-accelerator-brief.html</span>
+              </div>
+              <div class="artifact-preview">
+                <div class="artifact-preview-head">
+                  <img src="../control/static/amd-logo-white.png" alt="AMD" />
+                  <span>EXAMPLE OUTPUT · PRIMARY-SOURCE CITATIONS</span>
+                </div>
+                <h3>AMD Instinct™ accelerator comparison</h3>
+                <p>A booth-ready, self-contained microsite with structured source notes and review status.</p>
+                <div class="accelerator-cards">
+                  <div class="accelerator-card">
+                    <b>ACCELERATOR</b>
+                    <strong>AMD Instinct MI300X</strong>
+                    <span>Product overview · cited source links →</span>
+                  </div>
+                  <div class="accelerator-card">
+                    <b>ACCELERATOR</b>
+                    <strong>AMD Instinct MI325X</strong>
+                    <span>Product overview · cited source links →</span>
+                  </div>
+                </div>
+              </div>
+            </article>
+            <div class="artifact-side">
+              <article class="artifact-file panel" id="artifact-file-one">
+                <span class="file-icon">HTML</span>
+                <div>
+                  <strong>amd-accelerator-brief.html</strong>
+                  <small>Self-contained browser artifact</small>
+                </div>
+              </article>
+              <article class="artifact-file panel" id="artifact-file-two">
+                <span class="file-icon">MD</span>
+                <div>
+                  <strong>sources.md</strong>
+                  <small>Primary-source notes and citations</small>
+                </div>
+              </article>
+              <article class="artifact-file panel" id="artifact-file-three">
+                <span class="file-icon">MD</span>
+                <div>
+                  <strong>review.md</strong>
+                  <small>Reviewer findings and verification</small>
+                </div>
+              </article>
+              <article class="review-panel panel">
+                <span class="mini-label">REVIEWER CHECK</span>
+                <h3>Task complete</h3>
+                <div class="review-check" id="review-one"><i>✓</i><span>Browser-ready artifact</span></div>
+                <div class="review-check" id="review-two"><i>✓</i><span>Citations included</span></div>
+                <div class="review-check" id="review-three"><i>✓</i><span>Reviewer verified</span></div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        <section class="scene cta" id="scene-cta" aria-label="Live at the AMD booth">
+          <div class="cta-content">
+            <img
+              class="cta-lockup"
+              id="cta-lockup"
+              src="../control/static/amd-lockup-white.png"
+              alt="AMD — together we advance"
+            />
+            <h2 id="cta-title">GIVE OPENCLAW<br /><span class="red">A MISSION.</span></h2>
+            <p class="cta-subtitle" id="cta-subtitle">Watch every route. Take home the artifacts.</p>
+            <div class="live-pill" id="cta-live">
+              <span class="live-dot" aria-hidden="true"></span>
+              <span>LIVE NOW · AMD BOOTH</span>
+            </div>
+            <div class="cta-flow" id="cta-flow">
+              <span>OpenClaw</span>
+              <span class="arrow">→</span>
+              <span>vLLM Semantic Router</span>
+              <span class="arrow">→</span>
+              <span>AMD Instinct + Fireworks</span>
+            </div>
+          </div>
+          <img class="cta-chevron" src="../control/static/amd-chevron.png" alt="" />
+        </section>
+      </main>
+
+      <footer class="footer-flow" id="footer-flow">
+        <div class="flow-main">
+          <span>OpenClaw</span>
+          <span class="arrow">→</span>
+          <span>vLLM Semantic Router</span>
+          <span class="arrow">→</span>
+          <span>AMD Instinct + Fireworks</span>
+        </div>
+        <span class="scope-short">CLOUD API/TOKEN ESTIMATES EXCLUDE LOCAL HARDWARE</span>
+      </footer>
+    </div>
+
+    <script>
+      (() => {
+        "use strict";
+
+        const DURATION = 60;
+        const $ = (id) => document.getElementById(id);
+        const clamp = (value, min = 0, max = 1) => Math.min(max, Math.max(min, value));
+        const ease = (value) => {
+          const x = clamp(value);
+          return x * x * (3 - 2 * x);
+        };
+        const ramp = (time, start, duration) => ease((time - start) / duration);
+        const lerp = (a, b, value) => a + (b - a) * value;
+
+        function sceneOpacity(time, start, end, fadeIn = 0.45, fadeOut = 0.55) {
+          if (time < start || time > end) return 0;
+          let opacity = 1;
+          if (time < start + fadeIn) opacity *= ease((time - start) / fadeIn);
+          if (time > end - fadeOut) opacity *= ease((end - time) / fadeOut);
+          return clamp(opacity);
+        }
+
+        function setScene(id, time, start, end, fadeIn, fadeOut) {
+          const node = $(id);
+          const opacity = sceneOpacity(time, start, end, fadeIn, fadeOut);
+          node.style.opacity = opacity.toFixed(4);
+          node.style.visibility = opacity > 0.001 ? "visible" : "hidden";
+          node.style.transform = `translate3d(0, ${(1 - opacity) * 8}px, 0)`;
+        }
+
+        function reveal(id, progress, distance = 24, scaleFrom = 0.985) {
+          const node = $(id);
+          const value = ease(progress);
+          node.style.opacity = value.toFixed(4);
+          node.style.transform =
+            `translate3d(0, ${(1 - value) * distance}px, 0) ` +
+            `scale(${lerp(scaleFrom, 1, value).toFixed(5)})`;
+          return value;
+        }
+
+        function setEffort(containerId, activeCount, color) {
+          const container = $(containerId);
+          container.style.setProperty("--route-color", color);
+          [...container.children].forEach((bar, index) => {
+            bar.classList.toggle("on", index < activeCount);
+          });
+        }
+
+        const missionPrompt =
+          "Research current public AMD Instinct MI300X and MI325X specifications from primary sources. " +
+          "Build a polished self-contained HTML comparison with citations, then have the reviewer verify it.";
+
+        const routeSteps = [
+          {
+            key: "qwen",
+            color: "#ed1c24",
+            agent: "COORDINATOR · PLAN",
+            sequence: "CALL 01",
+            request: "Plan the mission and assign specialists.",
+            decision: "EVERYDAY REASONING",
+            effort: "MEDIUM EFFORT",
+            effortCount: 3,
+            signals: ["Analysis task", "Effort medium", "Standard path"],
+          },
+          {
+            key: "glm",
+            color: "#ff6a00",
+            agent: "RESEARCHER · BROWSE PRIMARY SOURCES",
+            sequence: "CALL 02",
+            request: "Gather exact facts and citation-ready sources.",
+            decision: "TOOL ORCHESTRATION",
+            effort: "HIGH EFFORT",
+            effortCount: 4,
+            signals: ["Tools needed", "Agentic task", "Exact facts"],
+          },
+          {
+            key: "kimi",
+            color: "#d7bd74",
+            agent: "REVIEWER · FRONTIER REVIEW",
+            sequence: "CALL 05",
+            request: "Challenge the artifact and verify the final result.",
+            decision: "FRONTIER REASONING",
+            effort: "MAXIMUM EFFORT",
+            effortCount: 5,
+            signals: ["High difficulty", "Effort maximum", "Review pass"],
+          },
+        ];
+
+        const intelSteps = [
+          {
+            color: "#ff6a00",
+            model: "GLM-5.3-Flash",
+            location: "Fireworks · Serverless",
+            decision: "TOOL ORCHESTRATION",
+            explanation:
+              "The request needs browser and tool orchestration, so the router selected the pool’s agentic cloud path.",
+            task: "Tools needed",
+            conversation: "Active tool loop",
+            effortSignal: "Effort high",
+            effort: "HIGH",
+            effortCount: 4,
+          },
+          {
+            color: "#d7bd74",
+            model: "Kimi K3",
+            location: "Fireworks · Premium",
+            decision: "FRONTIER REASONING",
+            explanation:
+              "The review is marked as research-level work, triggering the premium model with the largest requested reasoning budget.",
+            task: "High difficulty",
+            conversation: "Artifact ready",
+            effortSignal: "Effort maximum",
+            effort: "MAXIMUM",
+            effortCount: 5,
+          },
+        ];
+
+        function updateHook(time) {
+          const local = time;
+          reveal("hook-eyebrow", ramp(local, 0.0, 0.35), 12);
+          reveal("hook-one", ramp(local, -0.05, 0.4), 34, 0.97);
+          reveal("hook-three", ramp(local, 0.52, 0.42), 34, 0.97);
+          reveal("hook-routed", ramp(local, 1.12, 0.42), 34, 0.97);
+          reveal("hook-subtitle", ramp(local, 1.85, 0.4), 15);
+          const system = reveal("hook-system", ramp(local, 0.45, 0.7), 22, 0.95);
+          const pulse = 1 + Math.sin(time * 6.1) * 0.018 * system;
+          $("hook-router").style.transform = `translate(-50%, -50%) scale(${pulse.toFixed(4)})`;
+        }
+
+        function updateMission(time) {
+          const local = time - 2.8;
+          reveal("mission-eyebrow", ramp(local, 0.1, 0.35), 14);
+          reveal("mission-title", ramp(local, 0.35, 0.55), 28);
+          reveal("mission-copy", ramp(local, 0.85, 0.45), 18);
+          reveal("mission-card", ramp(local, 0.35, 0.65), 34, 0.97);
+          const typing = clamp((local - 1.1) / 2.45);
+          $("typed-prompt").textContent = missionPrompt.slice(
+            0,
+            Math.floor(missionPrompt.length * typing)
+          );
+          $("prompt-cursor").style.opacity =
+            typing < 1 && Math.floor(local * 4) % 2 === 0 ? "1" : "0.25";
+          reveal("mission-tags", ramp(local, 2.2, 0.45), 13);
+          const button = reveal("run-button", ramp(local, 3.45, 0.5), 16);
+          $("run-button").style.boxShadow =
+            `0 18px ${36 + Math.sin(time * 5) * 6}px rgba(237, 28, 36, ${0.18 + button * 0.08})`;
+        }
+
+        function updateDelegation(time) {
+          const local = time - 7.8;
+          reveal("delegation-title", ramp(local, 0.1, 0.45), 20);
+          reveal("delegation-copy", ramp(local, 0.35, 0.5), 16);
+          reveal("agent-coordinator", ramp(local, 0.75, 0.55), 24);
+          reveal("agent-researcher", ramp(local, 1.55, 0.5), 26);
+          reveal("agent-builder", ramp(local, 2.25, 0.5), 26);
+          reveal("agent-reviewer", ramp(local, 3.05, 0.5), 26);
+
+          const lines = [
+            ["delegate-line-researcher", 1.25],
+            ["delegate-line-builder", 1.95],
+            ["delegate-line-reviewer", 2.75],
+          ];
+          lines.forEach(([id, start]) => {
+            const progress = ramp(local, start, 0.9);
+            $(id).style.strokeDashoffset = String(620 * (1 - progress));
+            $(id).style.opacity = String(0.25 + progress * 0.75);
+          });
+
+          const coordinatorActive = local > 0.8;
+          const researcherActive = local > 1.7;
+          const builderActive = local > 2.5;
+          const reviewerActive = local > 3.45;
+          $("agent-coordinator").classList.toggle("active", coordinatorActive);
+          $("agent-researcher").classList.toggle("active", researcherActive);
+          $("agent-builder").classList.toggle("active", builderActive);
+          $("agent-reviewer").classList.toggle("active", reviewerActive);
+          $("state-coordinator").textContent =
+            local > 4.6 ? "Assembling specialist work…" : "Delegating mission…";
+          $("state-researcher").textContent =
+            researcherActive ? "Browsing primary sources…" : "Queued";
+          $("state-builder").textContent =
+            builderActive ? "Building HTML artifact…" : "Queued";
+          $("state-reviewer").textContent =
+            reviewerActive ? "Preparing verification…" : "Waiting for artifact";
+        }
+
+        function updateRouting(time) {
+          const local = time - 13.8;
+          const phase = local < 5.2 ? 0 : local < 10.2 ? 1 : 2;
+          const step = routeSteps[phase];
+          const phaseStart = [0.2, 5.2, 10.2][phase];
+          const routeProgress = ramp(local, phaseStart + 0.25, 1.1);
+          const cards = {
+            qwen: $("route-qwen"),
+            glm: $("route-glm"),
+            kimi: $("route-kimi"),
+          };
+          Object.entries(cards).forEach(([key, card]) => {
+            const selected = key === step.key;
+            card.classList.toggle("selected", selected);
+            card.style.transform = selected ? "scale(1.025)" : "scale(0.985)";
+            card.style.opacity = selected ? "1" : "0.63";
+          });
+
+          $("route-agent").textContent = step.agent;
+          $("route-sequence").textContent = step.sequence;
+          $("route-request").textContent = step.request;
+          $("route-decision").textContent = step.decision;
+          $("route-decision").style.color = step.color;
+          $("route-effort-label").textContent = step.effort;
+          $("route-signal-one").textContent = step.signals[0];
+          $("route-signal-two").textContent = step.signals[1];
+          $("route-signal-three").textContent = step.signals[2];
+          setEffort("route-effort-bars", step.effortCount, step.color);
+
+          $("route-call-line").style.strokeDashoffset = String(760 * (1 - routeProgress));
+          ["qwen", "glm", "kimi"].forEach((key) => {
+            const line = $(`route-line-${key}`);
+            const selected = key === step.key;
+            line.style.stroke = selected ? step.color : "#34373d";
+            line.style.opacity = selected ? "0.95" : "0.18";
+            line.style.strokeWidth = selected ? "4" : "2";
+            line.style.strokeDashoffset = String(
+              selected ? 760 * (1 - routeProgress) : 0
+            );
+          });
+          const corePulse = 1 + Math.sin(time * 5.4) * 0.012;
+          $("router-core").style.transform = `scale(${corePulse.toFixed(4)})`;
+          $("router-core").style.borderColor = step.color;
+          $("router-core").style.boxShadow =
+            `0 0 0 18px ${step.color}12, 0 0 70px ${step.color}2a`;
+        }
+
+        function updateIntelligence(time) {
+          const local = time - 28.8;
+          const step = intelSteps[local < 5.1 ? 0 : 1];
+          const card = $("route-intelligence-card");
+          card.style.setProperty("--intel-color", step.color);
+          $("intel-model").textContent = step.model;
+          $("intel-model").style.color = step.color;
+          $("intel-location").textContent = step.location;
+          $("intel-decision").textContent = step.decision;
+          $("intel-explanation").textContent = step.explanation;
+          $("intel-task-signal").textContent = step.task;
+          $("intel-conversation-signal").textContent = step.conversation;
+          $("intel-effort-signal").textContent = step.effortSignal;
+          $("intel-effort-label").textContent = step.effort;
+          setEffort("intel-effort-bars", step.effortCount, step.color);
+
+          reveal("route-intelligence-card", ramp(local, 0.4, 0.65), 24);
+          reveal("event-one", ramp(local, 1.2, 0.45), 20);
+          reveal("event-two", ramp(local, 2.6, 0.45), 20);
+          reveal("event-three", ramp(local, 4.1, 0.45), 20);
+          reveal("event-four", ramp(local, 5.7, 0.45), 20);
+          const pulse = 0.78 + Math.sin(time * 4.3) * 0.12;
+          $("visible-badge").style.boxShadow =
+            `0 0 24px rgba(86, 216, 144, ${Math.max(0, pulse * 0.12).toFixed(3)})`;
+        }
+
+        function updateCost(time) {
+          const local = time - 38.8;
+          const progress = ramp(local, 1.0, 3.1);
+          const actual = 0.00731 * progress;
+          const allKimi = 0.0705 * progress;
+          const savings = 89.6 * ramp(local, 3.1, 1.0);
+          $("prompt-token-count").textContent = Math.round(8000 * progress).toLocaleString("en-US");
+          $("output-token-count").textContent = Math.round(3100 * progress).toLocaleString("en-US");
+          $("routed-cost").textContent = `$${actual.toFixed(5)}`;
+          $("kimi-cost").textContent = `$${allKimi.toFixed(5)}`;
+          $("routed-cost-bar").style.width = `${10.37 * progress}%`;
+          $("kimi-cost-bar").style.width = `${100 * progress}%`;
+          $("savings-value").textContent = `${savings.toFixed(1)}%`;
+          reveal("savings-block", ramp(local, 3.25, 0.6), 16);
+        }
+
+        function updateArtifacts(time) {
+          const local = time - 46.8;
+          reveal("browser-artifact", ramp(local, 0.7, 0.7), 28, 0.98);
+          reveal("artifact-file-one", ramp(local, 1.6, 0.45), 20);
+          reveal("artifact-file-two", ramp(local, 2.35, 0.45), 20);
+          reveal("artifact-file-three", ramp(local, 3.1, 0.45), 20);
+          reveal("review-one", ramp(local, 4.0, 0.35), 12);
+          reveal("review-two", ramp(local, 4.7, 0.35), 12);
+          reveal("review-three", ramp(local, 5.4, 0.35), 12);
+        }
+
+        function updateCTA(time) {
+          const local = time - 54.8;
+          reveal("cta-lockup", ramp(local, 0.05, 0.55), 14);
+          reveal("cta-title", ramp(local, 0.45, 0.6), 28, 0.98);
+          reveal("cta-subtitle", ramp(local, 1.05, 0.5), 16);
+          reveal("cta-live", ramp(local, 1.65, 0.5), 15);
+          reveal("cta-flow", ramp(local, 2.35, 0.55), 15);
+          const liveScale = 1 + Math.sin(time * 5.5) * 0.012;
+          $("cta-live").style.transform += ` scale(${liveScale.toFixed(4)})`;
+        }
+
+        function render(time) {
+          const t = ((Number(time) % DURATION) + DURATION) % DURATION;
+          setScene("scene-hook", t, -0.2, 3.45, 0.2, 0.65);
+          setScene("scene-mission", t, 2.8, 8.45, 0.55, 0.65);
+          setScene("scene-delegation", t, 7.8, 14.45, 0.55, 0.65);
+          setScene("scene-routing", t, 13.8, 29.45, 0.55, 0.65);
+          setScene("scene-intelligence", t, 28.8, 39.45, 0.55, 0.65);
+          setScene("scene-cost", t, 38.8, 47.45, 0.55, 0.65);
+          setScene("scene-artifacts", t, 46.8, 55.45, 0.55, 0.65);
+          setScene("scene-cta", t, 54.8, 60.0, 0.55, 0.0);
+
+          $("progress-fill").style.width = `${(t / DURATION) * 100}%`;
+          $("time-code").textContent = `00:${String(Math.floor(t)).padStart(2, "0")}`;
+          const chromeOpacity = 1 - ramp(t, 54.55, 0.65);
+          $("brandbar").style.opacity = chromeOpacity.toFixed(4);
+          $("progress-track").style.opacity = chromeOpacity.toFixed(4);
+          $("footer-flow").style.opacity = chromeOpacity.toFixed(4);
+          const headerPulse = 1 + Math.sin(t * 4.2) * 0.05;
+          $("header-live-dot").style.transform = `scale(${headerPulse.toFixed(4)})`;
+
+          $("ambient-one").style.transform =
+            `translate3d(${Math.sin(t * 0.31) * 28}px, ${Math.cos(t * 0.23) * 18}px, 0)`;
+          $("ambient-two").style.transform =
+            `translate3d(${Math.cos(t * 0.21) * 24}px, ${Math.sin(t * 0.27) * 16}px, 0)`;
+
+          updateHook(t);
+          updateMission(t);
+          updateDelegation(t);
+          updateRouting(t);
+          updateIntelligence(t);
+          updateCost(t);
+          updateArtifacts(t);
+          updateCTA(t);
+          return t;
+        }
+
+        window.setTeaserTime = render;
+
+        const params = new URLSearchParams(window.location.search);
+        const captureMode = params.get("capture") === "1";
+        const initialTime = Number(params.get("t") || 0);
+        render(Number.isFinite(initialTime) ? initialTime : 0);
+        window.__TEASER_READY = true;
+
+        if (!captureMode) {
+          let started = performance.now() - initialTime * 1000;
+          let paused = false;
+          let pausedAt = initialTime;
+
+          function tick(now) {
+            if (!paused) render((now - started) / 1000);
+            requestAnimationFrame(tick);
+          }
+
+          document.addEventListener("keydown", (event) => {
+            if (event.code !== "Space") return;
+            event.preventDefault();
+            if (paused) {
+              started = performance.now() - pausedAt * 1000;
+              paused = false;
+            } else {
+              pausedAt = render((performance.now() - started) / 1000);
+              paused = true;
+            }
+          });
+          requestAnimationFrame(tick);
+        }
+      })();
+    </script>
+  </body>
+</html>

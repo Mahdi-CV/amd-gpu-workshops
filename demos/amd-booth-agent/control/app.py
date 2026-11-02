@@ -36,6 +36,9 @@ ROUTER_MODEL = os.getenv("ROUTER_MODEL", "vllm-sr/auto")
 PUBLIC_ORIGIN = os.getenv("BOOTH_PUBLIC_ORIGIN", "")
 MAX_PROMPT_CHARS = 4000
 MAX_RUN_SECONDS = 900
+TRACE_PROMPT_LIMIT = 4000
+TRACE_MESSAGE_LIMIT = 8
+TRACE_PREVIEW_LIMIT = 280
 
 MODEL_INFO = {
     "qwen/qwen3.8-27b": {
@@ -149,13 +152,114 @@ def compact_text(value: Any, limit: int = 180) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
-def latest_prompt(messages: Any) -> str:
+def bounded_trace_text(value: Any, limit: int = TRACE_PROMPT_LIMIT) -> str:
+    if isinstance(value, str):
+        text = value.replace("\r\n", "\n").replace("\r", "\n").strip()
+    elif value is None:
+        text = ""
+    else:
+        text = json.dumps(value, ensure_ascii=False, indent=2).strip()
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
+def trace_content(value: Any, limit: int = TRACE_PROMPT_LIMIT) -> str:
+    if isinstance(value, str):
+        return bounded_trace_text(value, limit)
+    if not isinstance(value, list):
+        return bounded_trace_text(value, limit)
+
+    parts: list[str] = []
+    for item in value:
+        if not isinstance(item, dict):
+            continue
+        item_type = str(item.get("type") or "content")
+        if item_type in {"text", "input_text", "output_text"}:
+            parts.append(str(item.get("text") or ""))
+        elif item_type in {"image", "image_url", "input_image"}:
+            parts.append("[image]")
+        elif item_type in {"tool_call", "tool_result"}:
+            parts.append(f"[{item_type}]")
+        else:
+            parts.append(f"[{item_type}]")
+    return bounded_trace_text("\n".join(parts), limit)
+
+
+def latest_prompt(messages: Any, limit: int = TRACE_PROMPT_LIMIT) -> str:
     if not isinstance(messages, list):
         return ""
     for message in reversed(messages):
         if isinstance(message, dict) and message.get("role") in {"user", "tool"}:
-            return compact_text(message.get("content"), 220)
+            return trace_content(message.get("content"), limit)
     return ""
+
+
+def summarize_messages(messages: Any) -> list[dict[str, Any]]:
+    if not isinstance(messages, list):
+        return []
+    rows: list[dict[str, Any]] = []
+    for message in messages[-TRACE_MESSAGE_LIMIT:]:
+        if not isinstance(message, dict):
+            continue
+        role = str(message.get("role") or "unknown")
+        content = message.get("content")
+        raw_chars = len(content) if isinstance(content, str) else 0
+        preview = (
+            "[system instructions hidden]"
+            if role == "system"
+            else trace_content(content, TRACE_PREVIEW_LIMIT)
+        )
+        rows.append(
+            {
+                "role": role,
+                "chars": raw_chars,
+                "preview": preview,
+                "tool_call_id": compact_text(
+                    message.get("tool_call_id"),
+                    80,
+                ),
+            }
+        )
+    return rows
+
+
+def declared_tool_names(tools: Any) -> list[str]:
+    if not isinstance(tools, list):
+        return []
+    names: list[str] = []
+    for tool in tools:
+        if not isinstance(tool, dict):
+            continue
+        function = tool.get("function") or {}
+        name = (
+            function.get("name")
+            if isinstance(function, dict)
+            else None
+        )
+        if isinstance(name, str) and name and name not in names:
+            names.append(name)
+    return names[:30]
+
+
+def normalized_tool_event(function: dict[str, Any]) -> dict[str, Any]:
+    name = str(function.get("name") or "tool")
+    raw_arguments = function.get("arguments")
+    nested_id = ""
+    arguments: Any = raw_arguments
+    if name == "tool_call" and isinstance(raw_arguments, str):
+        try:
+            parsed = json.loads(raw_arguments)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            nested_id = str(parsed.get("id") or "")
+            arguments = parsed.get("args", raw_arguments)
+            if nested_id:
+                name = nested_id.rsplit(":", 1)[-1]
+    return {
+        "name": name,
+        "arguments": compact_text(arguments, 1000),
+        "bridge_tool_id": nested_id or None,
+    }
 
 
 def parse_effort(headers: dict[str, str]) -> str:
@@ -306,7 +410,7 @@ class RunRecord:
         )
         return {
             "calls": sum(self.model_counts.values()),
-            "model_counts": self.model_counts,
+            "model_counts": dict(self.model_counts),
             "prompt_tokens": self.prompt_tokens,
             "completion_tokens": self.completion_tokens,
             "reasoning_tokens": self.reasoning_tokens,
@@ -814,12 +918,27 @@ async def proxy(agent: str, path: str, request: Request) -> Response:
     call_id = uuid.uuid4().hex[:10]
     started = time.perf_counter()
     if run:
+        messages = request_body.get("messages")
+        tools = request_body.get("tools")
+        prompt = latest_prompt(messages)
         await run.emit(
             "llm.request",
             call_id=call_id,
             agent=agent,
-            prompt=latest_prompt(request_body.get("messages")),
-            tool_count=len(request_body.get("tools") or []),
+            prompt=prompt,
+            prompt_chars=len(prompt),
+            message_count=len(messages) if isinstance(messages, list) else 0,
+            messages_summary=summarize_messages(messages),
+            tool_count=len(tools) if isinstance(tools, list) else 0,
+            tool_names=declared_tool_names(tools),
+            requested_model=request_body.get("model"),
+            stream=bool(request_body.get("stream")),
+            max_tokens=(
+                request_body.get("max_completion_tokens")
+                or request_body.get("max_tokens")
+            ),
+            temperature=request_body.get("temperature"),
+            request_path=f"/v1/{path}",
         )
 
     upstream_url = f"{ROUTER_BASE_URL}/{path}"
@@ -899,6 +1018,26 @@ async def proxy(agent: str, path: str, request: Request) -> Response:
                 "projection_signals": route_headers.get(
                     "x-vsr-matched-projections"
                 ),
+                "keyword_signals": route_headers.get(
+                    "x-vsr-matched-keywords"
+                ),
+                "routing_latency_ms": route_headers.get(
+                    "x-vsr-routing-latency-ms"
+                ),
+                "selected_algorithm": route_headers.get(
+                    "x-vsr-selected-algorithm"
+                ),
+                "selected_recipe": route_headers.get(
+                    "x-vsr-selected-recipe"
+                ),
+                "context_tokens": route_headers.get(
+                    "x-vsr-context-token-count"
+                ),
+                "router_cost": route_headers.get("x-vsr-cost"),
+                "router_cost_currency": route_headers.get(
+                    "x-vsr-cost-currency"
+                ),
+                "response_model": parsed.get("model"),
                 "latency_seconds": round(elapsed, 3),
                 "usage": usage,
                 "estimated_cost": round(actual, 6),
@@ -909,14 +1048,11 @@ async def proxy(agent: str, path: str, request: Request) -> Response:
             message = choices[0].get("message") if choices else {}
             for tool_call in (message or {}).get("tool_calls") or []:
                 function = tool_call.get("function") or {}
+                tool_event = normalized_tool_event(function)
                 await run.emit(
                     "tool.call",
                     agent=agent,
-                    name=function.get("name") or "tool",
-                    arguments=compact_text(
-                        function.get("arguments"),
-                        300,
-                    ),
+                    **tool_event,
                 )
             await run.emit("metrics.updated", metrics=run.metrics())
 

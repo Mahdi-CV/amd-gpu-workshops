@@ -217,6 +217,11 @@ const state = {
   seenEvents: new Set(),
   agents: new Map(),
   recoveryInFlight: false,
+  callRecords: new Map(),
+  routeRecords: new Map(),
+  routeSequence: 0,
+  activeRouteId: null,
+  routeTrigger: null,
 };
 
 const $ = (id) => document.getElementById(id);
@@ -238,6 +243,12 @@ function safeColor(value) {
 function numeric(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
+}
+
+function reportedNumber(value) {
+  if (value === null || value === undefined || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : null;
 }
 
 function count(value) {
@@ -268,6 +279,37 @@ function titleCase(value) {
     .replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
+function objectValue(value) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value
+    : {};
+}
+
+function firstReported(...values) {
+  return values.find(
+    (value) =>
+      value !== null &&
+      value !== undefined &&
+      !(typeof value === "string" && !value.trim()),
+  );
+}
+
+function readableValue(value, fallback = "Not reported", limit = 8000) {
+  if (value === null || value === undefined || value === "") return fallback;
+  let text = "";
+  if (typeof value === "string") {
+    text = value.trim();
+  } else {
+    try {
+      text = JSON.stringify(value, null, 2);
+    } catch {
+      text = String(value);
+    }
+  }
+  if (!text) return fallback;
+  return text.length > limit ? `${text.slice(0, limit - 1)}…` : text;
+}
+
 function normalizeConfig(body) {
   const models =
     body?.models &&
@@ -290,16 +332,17 @@ function normalizeConfig(body) {
 }
 
 function modelInfo(model, inlineInfo = {}) {
-  const configured = state.config?.models?.[model] || {};
+  const inline = objectValue(inlineInfo);
+  const configured = objectValue(state.config?.models?.[model]);
   const fallbackLabel = titleCase(String(model || "Unknown model").split("/").at(-1));
   return {
-    label: inlineInfo.label || configured.label || fallbackLabel,
-    location: inlineInfo.location || configured.location || "Location not reported",
-    tier: inlineInfo.tier || configured.tier || "unknown",
-    color: safeColor(inlineInfo.color || configured.color),
-    input_rate: numeric(inlineInfo.input_rate ?? configured.input_rate),
-    cached_rate: numeric(inlineInfo.cached_rate ?? configured.cached_rate),
-    output_rate: numeric(inlineInfo.output_rate ?? configured.output_rate),
+    label: inline.label || configured.label || fallbackLabel,
+    location: inline.location || configured.location || "Location not reported",
+    tier: inline.tier || configured.tier || "unknown",
+    color: safeColor(inline.color || configured.color),
+    input_rate: numeric(inline.input_rate ?? configured.input_rate),
+    cached_rate: numeric(inline.cached_rate ?? configured.cached_rate),
+    output_rate: numeric(inline.output_rate ?? configured.output_rate),
   };
 }
 
@@ -313,6 +356,16 @@ function modelRole(model, info) {
 function splitSignals(value) {
   if (Array.isArray(value)) {
     return value.flatMap((item) => splitSignals(item));
+  }
+  if (value && typeof value === "object") {
+    return Object.entries(value).flatMap(([key, item]) => {
+      if (item === false || item === null || item === undefined) return [];
+      if (item === true) return [key];
+      if (typeof item === "string" || typeof item === "number") {
+        return [`${key}: ${item}`];
+      }
+      return splitSignals(item);
+    });
   }
   const text = String(value || "").trim();
   if (!text) return [];
@@ -340,7 +393,8 @@ function humanizeSignal(value) {
   if (SIGNAL_LABELS[normalized]) return SIGNAL_LABELS[normalized];
   return raw
     .replace(/[_-]+/g, " ")
-    .replace(/\s*([:=])\s*/g, " $1 ")
+    .replace(/\s*:\s*/g, ": ")
+    .replace(/\s*=\s*/g, " = ")
     .replace(/\s+/g, " ")
     .trim()
     .replace(/\b\w/g, (character) => character.toUpperCase());
@@ -398,6 +452,12 @@ function renderEffortMeter(effort) {
          aria-label="Router-requested reasoning effort: ${escapeHtml(effort.label)}">
       ${segments}
     </div>`;
+}
+
+function isGuardRoute(event) {
+  const decision = String(event?.decision || "").trim().toLowerCase();
+  const model = String(event?.model || "").trim().toLowerCase();
+  return decision === "guard" || model.includes("safety guard");
 }
 
 async function fetchJson(url, options = {}) {
@@ -703,6 +763,69 @@ function renderAgentMap() {
   $("agent-summary").textContent = summary;
 }
 
+function normalizeCallId(value) {
+  return compactText(value, 180);
+}
+
+function rememberModelEvent(event) {
+  if (
+    event.type !== "llm.request" &&
+    event.type !== "route.selected" &&
+    event.type !== "llm.error"
+  ) {
+    return "";
+  }
+
+  const callId = normalizeCallId(event.call_id);
+  let record = callId ? state.callRecords.get(callId) : null;
+  if (!record && callId) {
+    record = {
+      callId,
+      request: null,
+      route: null,
+      error: null,
+      routeId: "",
+    };
+    state.callRecords.set(callId, record);
+  }
+
+  if (!record && event.type === "route.selected") {
+    record = {
+      callId: "",
+      request: null,
+      route: null,
+      error: null,
+      routeId: "",
+    };
+  }
+  if (!record) return "";
+
+  if (event.type === "llm.request") {
+    record.request = event;
+  } else if (event.type === "route.selected") {
+    record.route = event;
+    if (!record.routeId) {
+      state.routeSequence += 1;
+      record.routeId = `route-${state.routeSequence}`;
+      state.routeRecords.set(record.routeId, record);
+    }
+  } else if (event.type === "llm.error") {
+    record.error = event;
+  }
+
+  if (record.routeId && state.activeRouteId === record.routeId) {
+    renderRouteInspector(record);
+  }
+  return record.routeId;
+}
+
+function resetRouteInspectionState() {
+  closeRouteInspector({ restoreFocus: false });
+  state.callRecords = new Map();
+  state.routeRecords = new Map();
+  state.routeSequence = 0;
+}
+
 function setRunControls(phase) {
   state.runPhase = phase;
   const busy = phase !== "idle";
@@ -749,6 +872,7 @@ function resetDisplay({ clearMessage = true } = {}) {
   state.startedAt = null;
   state.seenEvents = new Set();
   state.recoveryInFlight = false;
+  resetRouteInspectionState();
   if (state.timer) clearInterval(state.timer);
   state.timer = null;
   $("run-clock").textContent = "00:00";
@@ -806,6 +930,7 @@ async function startRun() {
   setFormMessage("");
   state.runTitle = state.selectedTask?.title || "Custom booth task";
   state.seenEvents = new Set();
+  resetRouteInspectionState();
   resetAgents();
   updateMetrics({});
   $("route-detail").className = "route-placeholder";
@@ -862,6 +987,10 @@ function connectEventStream() {
       event = JSON.parse(message.data);
     } catch {
       console.warn("Ignored malformed booth event", message.data);
+      return;
+    }
+    if (!event || typeof event !== "object" || Array.isArray(event)) {
+      console.warn("Ignored non-object booth event", event);
       return;
     }
     const sequence = numeric(event.seq, -1);
@@ -921,9 +1050,11 @@ async function recoverRun(runId) {
 }
 
 function handleEvent(event) {
+  if (!event || typeof event !== "object" || Array.isArray(event)) return;
+  const routeId = rememberModelEvent(event);
   recordAgentEvent(event);
-  appendEvent(event);
-  if (event.type === "route.selected") updateRoute(event);
+  appendEvent(event, routeId);
+  if (event.type === "route.selected") updateRoute(event, routeId);
   if (event.metrics) updateMetrics(event.metrics);
   if (event.type === "run.waiting") {
     setRunState("Waiting for subagents…", "warning");
@@ -1020,7 +1151,7 @@ function eventTime(timestamp) {
   });
 }
 
-function appendEvent(event) {
+function appendEvent(event, routeInspectorId = "") {
   if (event.type === "metrics.updated") return;
   const description = eventDescription(event);
   if (!description) return;
@@ -1028,16 +1159,22 @@ function appendEvent(event) {
   const shouldFollow =
     timeline.scrollHeight - timeline.scrollTop - timeline.clientHeight < 90;
   const route = event.type === "route.selected";
+  const inspectorId =
+    routeInspectorId || (route ? rememberModelEvent(event) : "");
   const effort = route ? effortInfo(event) : null;
-  const usage = event.usage || {};
-  const cloudCost = Math.max(0, numeric(event.estimated_cost));
+  const usage = objectValue(event.usage);
+  const latency = reportedNumber(event.latency_seconds);
+  const cloudCost = reportedNumber(event.estimated_cost);
+  const promptTokens = reportedNumber(usage.prompt_tokens);
+  const completionTokens = reportedNumber(usage.completion_tokens);
+  const reasoningTokens = reportedNumber(usage.reasoning_tokens);
   const stats = route
     ? `<div class="event-stats">
-        <span>${numeric(event.latency_seconds).toFixed(2)}s latency</span>
-        <span>${count(usage.prompt_tokens)} prompt</span>
-        <span>${count(usage.completion_tokens)} output</span>
-        <span>${count(usage.reasoning_tokens)} reasoning</span>
-        <span>${cloudCost ? money(cloudCost) : "$0"} cloud API*</span>
+        <span>${latency === null ? "—" : `${Math.max(0, latency).toFixed(2)}s`} latency</span>
+        <span>${promptTokens === null ? "—" : count(promptTokens)} prompt</span>
+        <span>${completionTokens === null ? "—" : count(completionTokens)} output</span>
+        <span>${reasoningTokens === null ? "—" : count(reasoningTokens)} reasoning</span>
+        <span>${cloudCost === null ? "—" : money(cloudCost)} cloud API*</span>
       </div>`
     : "";
   const signals = route
@@ -1045,6 +1182,7 @@ function appendEvent(event) {
         ...splitSignals(event.decision_signals),
         ...splitSignals(event.conversation_signals),
         ...splitSignals(event.projection_signals),
+        ...splitSignals(event.keyword_signals),
       ])
         .slice(0, 7)
         .map(
@@ -1067,17 +1205,44 @@ function appendEvent(event) {
          REASONING · ${escapeHtml(effort.label)}
        </span>`
     : "";
+  const cardContent = `
+    <div class="event-badges">${agent}${effortBadge}</div>
+    <div class="event-title">${escapeHtml(description.title)}</div>
+    <div class="event-copy">${escapeHtml(description.copy || "")}</div>
+    ${signals ? `<div class="chips">${signals}</div>` : ""}
+    ${stats}
+    ${
+      route && inspectorId
+        ? `<span class="event-route-action" aria-hidden="true">
+             Inspect routing decision <strong>↗</strong>
+           </span>`
+        : ""
+    }`;
+  const card =
+    route && inspectorId
+      ? `<button
+           class="event-card route route-trigger"
+           type="button"
+           data-route-id="${escapeHtml(inspectorId)}"
+           aria-haspopup="dialog"
+           aria-controls="route-inspector"
+           aria-label="${escapeHtml(
+             `${description.title}. Open routing decision inspector.`,
+           )}"
+           style="border-left-color:${safeColor(description.color)}"
+         >
+           ${cardContent}
+         </button>`
+      : `<div
+           class="event-card ${route ? "route" : ""}"
+           style="border-left-color:${safeColor(description.color)}"
+         >
+           ${cardContent}
+         </div>`;
   const html = `
     <div class="event">
       <div class="event-meta">${eventTime(event.timestamp)}</div>
-      <div class="event-card ${route ? "route" : ""}"
-           style="border-left-color:${safeColor(description.color)}">
-        <div class="event-badges">${agent}${effortBadge}</div>
-        <div class="event-title">${escapeHtml(description.title)}</div>
-        <div class="event-copy">${escapeHtml(description.copy || "")}</div>
-        ${signals ? `<div class="chips">${signals}</div>` : ""}
-        ${stats}
-      </div>
+      ${card}
     </div>`;
   timeline.insertAdjacentHTML("beforeend", html);
   if (shouldFollow) timeline.scrollTop = timeline.scrollHeight;
@@ -1108,17 +1273,21 @@ function confidenceLabel(value) {
   return `${percent.toFixed(0)}% confidence`;
 }
 
-function updateRoute(event) {
+function updateRoute(event, routeInspectorId = "") {
   const info = modelInfo(event.model, event.model_info);
   const narrative = routeNarrative(event);
   const effort = effortInfo(event);
   const confidence = confidenceLabel(event.confidence);
-  const cloudCost = Math.max(0, numeric(event.estimated_cost));
-  const ranking = compactText(event.decision_ranking);
+  const latency = reportedNumber(event.latency_seconds);
+  const cloudCost = reportedNumber(event.estimated_cost);
+  const ranking = compactText(
+    readableValue(event.decision_ranking, ""),
+  );
   const signalGroups = [
-    renderSignalGroup("Task signals", event.decision_signals),
+    renderSignalGroup("Semantic signals", event.decision_signals),
     renderSignalGroup("Conversation signals", event.conversation_signals),
-    renderSignalGroup("Effort signals", event.projection_signals),
+    renderSignalGroup("Projection signals", event.projection_signals),
+    renderSignalGroup("Keyword signals", event.keyword_signals),
   ].join("");
   $("route-detail").className = "route-card";
   $("route-detail").innerHTML = `
@@ -1151,11 +1320,11 @@ function updateRoute(event) {
     </div>
 
     <div class="route-facts">
-      <span><small>LATENCY</small><strong>${numeric(
-        event.latency_seconds,
-      ).toFixed(2)}s</strong></span>
+      <span><small>LATENCY</small><strong>${
+        latency === null ? "—" : `${Math.max(0, latency).toFixed(2)}s`
+      }</strong></span>
       <span><small>CLOUD API*</small><strong>${
-        cloudCost ? money(cloudCost) : "$0"
+        cloudCost === null ? "—" : money(cloudCost)
       }</strong></span>
       ${
         confidence
@@ -1174,7 +1343,731 @@ function updateRoute(event) {
            </details>`
         : ""
     }
+
+    ${
+      routeInspectorId
+        ? `<button class="route-detail-action" type="button"
+                   data-route-id="${escapeHtml(routeInspectorId)}"
+                   aria-haspopup="dialog" aria-controls="route-inspector">
+             Inspect full routing decision <span aria-hidden="true">↗</span>
+           </button>`
+        : ""
+    }
   `;
+}
+
+function inspectorAgentIdentity(value) {
+  const id = compactText(value, 120);
+  if (!id) {
+    return {
+      label: "Not reported",
+      detail: "Agent identity was not included",
+    };
+  }
+  const catalog = agentCatalogEntry(id);
+  const known = state.agents.get(id);
+  const label = known?.label || catalog?.label || titleCase(id) || "Agent";
+  const kind =
+    known?.kind || catalog?.kind || (id === "main" ? "MAIN" : "SUBAGENT");
+  return {
+    label,
+    detail: `${kind === "MAIN" ? "Main agent" : "Subagent"} · ${id}`,
+  };
+}
+
+function inspectorCount(value) {
+  const number = reportedNumber(value);
+  return number === null ? null : Math.max(0, Math.round(number));
+}
+
+function inspectorText(value, fallback = "—", limit = 260) {
+  if (typeof value === "boolean") return value ? "Yes" : "No";
+  return readableValue(value, fallback, limit);
+}
+
+function inspectorStringList(value) {
+  if (Array.isArray(value)) {
+    return uniqueSignals(
+      value
+        .map((item) => compactText(item, 180))
+        .filter(Boolean),
+    );
+  }
+  const text = String(value || "").trim();
+  if (!text) return [];
+  if (text.startsWith("[") && text.endsWith("]")) {
+    try {
+      return inspectorStringList(JSON.parse(text));
+    } catch {
+      // Fall through to the comma-separated representation.
+    }
+  }
+  return uniqueSignals(
+    text
+      .split(",")
+      .map((item) => item.trim())
+      .filter(Boolean),
+  );
+}
+
+function renderMessagesSummary(value) {
+  if (!Array.isArray(value)) {
+    return `<pre>${escapeHtml(
+      readableValue(value, "No conversation summary was reported for this call."),
+    )}</pre>`;
+  }
+  const rows = value.filter(
+    (row) => row && typeof row === "object" && !Array.isArray(row),
+  );
+  if (!rows.length) {
+    return `<p class="inspector-empty-copy">No conversation messages were reported for this call.</p>`;
+  }
+  return `
+    <div class="inspector-message-list">
+      ${rows
+        .map((row) => {
+          const role = compactText(row.role, 60) || "unknown";
+          const chars = inspectorCount(row.chars);
+          const toolCallId = compactText(row.tool_call_id, 100);
+          const metadata = [
+            chars === null ? "" : `${count(chars)} chars`,
+            toolCallId ? `tool call ${toolCallId}` : "",
+          ]
+            .filter(Boolean)
+            .join(" · ");
+          return `
+            <div class="inspector-message">
+              <div>
+                <span>${escapeHtml(role)}</span>
+                ${metadata ? `<small>${escapeHtml(metadata)}</small>` : ""}
+              </div>
+              <p>${escapeHtml(
+                readableValue(row.preview, "No message preview reported.", 1200),
+              )}</p>
+            </div>`;
+        })
+        .join("")}
+    </div>`;
+}
+
+function renderInspectorMetadata(items, className = "") {
+  return `
+    <div class="inspector-metadata-grid ${escapeHtml(className)}">
+      ${items
+        .map(
+          ({ label, value, detail = "" }) => `
+            <article>
+              <small>${escapeHtml(label)}</small>
+              <strong>${escapeHtml(value)}</strong>
+              ${detail ? `<span>${escapeHtml(detail)}</span>` : ""}
+            </article>`,
+        )
+        .join("")}
+    </div>`;
+}
+
+function renderInspectorSignalGroup(label, values, tone) {
+  const signals = uniqueSignals(splitSignals(values));
+  return `
+    <article class="inspector-signal-group ${escapeHtml(tone)}">
+      <div class="inspector-signal-heading">
+        <span aria-hidden="true"></span>
+        <div>
+          <h4>${escapeHtml(label)}</h4>
+          <small>${
+            signals.length
+              ? `${count(signals.length)} matched`
+              : "None reported"
+          }</small>
+        </div>
+      </div>
+      ${
+        signals.length
+          ? `<div class="chips">
+               ${signals
+                 .map(
+                   (signal) =>
+                     `<span class="chip">${escapeHtml(
+                       humanizeSignal(signal),
+                     )}</span>`,
+                 )
+                 .join("")}
+             </div>`
+          : `<p>No ${escapeHtml(label.toLowerCase())} were included in this route event.</p>`
+      }
+    </article>`;
+}
+
+function routeExplanationSteps(record) {
+  const route = objectValue(record.route);
+  const request = objectValue(record.request);
+  const agent = inspectorAgentIdentity(
+    firstReported(route.agent, request.agent),
+  );
+  const info = modelInfo(route.model, route.model_info);
+  const narrative = routeNarrative(route);
+  const effort = effortInfo(route);
+  const guard = isGuardRoute(route);
+  const semantic = uniqueSignals(splitSignals(route.decision_signals)).map(
+    humanizeSignal,
+  );
+  const conversation = uniqueSignals(
+    splitSignals(route.conversation_signals),
+  ).map(humanizeSignal);
+  const projection = uniqueSignals(
+    splitSignals(route.projection_signals),
+  ).map(humanizeSignal);
+  const keywords = uniqueSignals(splitSignals(route.keyword_signals)).map(
+    humanizeSignal,
+  );
+  const toolCount = inspectorCount(
+    firstReported(request.tool_count, route.tool_count),
+  );
+  const toolNames = inspectorStringList(
+    firstReported(request.tool_names, route.tool_names),
+  );
+  const ranking = readableValue(route.decision_ranking, "");
+  const confidence =
+    confidenceLabel(route.confidence) ||
+    compactText(firstReported(route.confidence, ""), 80);
+  const algorithm = compactText(route.selected_algorithm, 180);
+  const recipe = compactText(route.selected_recipe, 180);
+  const steps = [];
+
+  steps.push(
+    record.request
+      ? `${agent.label} submitted the model request${
+          toolCount === null
+            ? ""
+            : ` with ${count(toolCount)} ${
+                toolCount === 1 ? "tool" : "tools"
+              } available`
+        }${
+          toolNames.length
+            ? ` (${toolNames.slice(0, 6).join(", ")}${
+                toolNames.length > 6 ? ", …" : ""
+              })`
+            : ""
+        }. The prompt shown above comes from the llm.request event matched to this route by call ID.`
+      : `The route event identifies ${agent.label}, but no matching llm.request payload was available, so prompt and tool context may be incomplete.`,
+  );
+  steps.push(
+    semantic.length
+      ? `Semantic matching identified: ${semantic.join(", ")}.`
+      : "The route event did not report a matched semantic signal.",
+  );
+  steps.push(
+    conversation.length
+      ? `Conversation context added: ${conversation.join(", ")}.`
+      : "No conversation-level signal was reported for this call.",
+  );
+  steps.push(
+    projection.length
+      ? `The projection layer added: ${projection.join(", ")}.`
+      : "No projection signal was reported; the configured effort is taken from the selected route metadata when available.",
+  );
+  if (keywords.length) {
+    steps.push(`Keyword matching also identified: ${keywords.join(", ")}.`);
+  }
+  steps.push(
+    guard
+      ? "Those inputs triggered the safety guard before normal model generation, so a standard model candidate did not need to win."
+      : `The router applied the “${narrative.label}” policy. ${narrative.explanation}`,
+  );
+  if (algorithm || recipe) {
+    steps.push(
+      `Candidate selection used${
+        algorithm ? ` the ${algorithm} algorithm` : " the reported algorithm"
+      }${recipe ? ` with recipe ${recipe}` : ""}.`,
+    );
+  }
+  steps.push(
+    ranking || confidence
+      ? `The router${
+          confidence ? ` reported ${confidence}` : ""
+        }${
+          ranking
+            ? `${confidence ? " and" : ""} emitted the candidate ranking shown above`
+            : ""
+        }.`
+      : "No candidate ranking or confidence was reported, so the selected decision and matched signals are the available routing evidence.",
+  );
+  steps.push(
+    guard
+      ? "The safety policy returned the guard route. Token, latency, and cost fields are shown only when the backend reported them."
+      : `That policy selected ${info.label} at ${info.location} and configured ${effort.label.toLowerCase()} reasoning effort. ${effort.explanation}`,
+  );
+  return steps;
+}
+
+function renderRouteInspector(record) {
+  const route = objectValue(record.route);
+  if (!route || !Object.keys(route).length) return;
+  const request = objectValue(record.request);
+  const errorEvent = objectValue(record.error);
+  const guard = isGuardRoute(route);
+  const info = modelInfo(route.model, route.model_info);
+  const narrative = routeNarrative(route);
+  const effort = effortInfo(route);
+  const agent = inspectorAgentIdentity(
+    firstReported(route.agent, request.agent),
+  );
+  const prompt = readableValue(
+    firstReported(request.prompt, route.prompt),
+    record.request
+      ? "The request event did not include a prompt."
+      : "Prompt unavailable because no matching llm.request event was received.",
+  );
+  const messagesSummary = firstReported(
+    request.messages_summary,
+    route.messages_summary,
+  );
+  const toolCount = inspectorCount(
+    firstReported(request.tool_count, route.tool_count),
+  );
+  const toolNames = inspectorStringList(
+    firstReported(request.tool_names, route.tool_names),
+  );
+  const promptChars = inspectorCount(request.prompt_chars);
+  const messageCount = inspectorCount(request.message_count);
+  const maxTokens = inspectorCount(request.max_tokens);
+  const requestMetadata = [
+    {
+      label: "REQUESTED MODEL",
+      value: inspectorText(request.requested_model),
+    },
+    {
+      label: "API PATH",
+      value: inspectorText(request.request_path),
+    },
+    {
+      label: "MESSAGES",
+      value: messageCount === null ? "—" : count(messageCount),
+    },
+    {
+      label: "PROMPT CHARS",
+      value: promptChars === null ? "—" : count(promptChars),
+    },
+    {
+      label: "STREAMING",
+      value:
+        typeof request.stream === "boolean"
+          ? request.stream
+            ? "Yes"
+            : "No"
+          : "—",
+    },
+    {
+      label: "MAX OUTPUT TOKENS",
+      value: maxTokens === null ? "—" : count(maxTokens),
+    },
+    {
+      label: "TEMPERATURE",
+      value: inspectorText(request.temperature),
+    },
+  ];
+  const usage = objectValue(route.usage);
+  const promptTokens = inspectorCount(usage.prompt_tokens);
+  const completionTokens = inspectorCount(usage.completion_tokens);
+  const cachedTokens = inspectorCount(usage.cached_tokens);
+  const reasoningTokens = inspectorCount(usage.reasoning_tokens);
+  let totalTokens = inspectorCount(usage.total_tokens);
+  if (
+    totalTokens === null &&
+    (promptTokens !== null || completionTokens !== null)
+  ) {
+    totalTokens = (promptTokens || 0) + (completionTokens || 0);
+  }
+  const latency = reportedNumber(route.latency_seconds);
+  const cloudCost = reportedNumber(route.estimated_cost);
+  const routingLatencyNumber = reportedNumber(route.routing_latency_ms);
+  const routingLatency =
+    routingLatencyNumber === null
+      ? inspectorText(route.routing_latency_ms)
+      : `${Math.max(0, routingLatencyNumber).toFixed(
+          routingLatencyNumber >= 10 ? 0 : 2,
+        )} ms`;
+  const contextTokens = inspectorCount(route.context_tokens);
+  const routerCostValue = inspectorText(route.router_cost);
+  const routerCostCurrency = compactText(route.router_cost_currency, 40);
+  const routerCost =
+    routerCostValue === "—"
+      ? "—"
+      : `${routerCostValue}${routerCostCurrency ? ` ${routerCostCurrency}` : ""}`;
+  const routerMetadata = [
+    {
+      label: "SELECTED ALGORITHM",
+      value: inspectorText(route.selected_algorithm),
+    },
+    {
+      label: "SELECTED RECIPE",
+      value: inspectorText(route.selected_recipe),
+    },
+    {
+      label: "ROUTER LATENCY",
+      value: routingLatency,
+    },
+    {
+      label: "CONTEXT TOKENS",
+      value: contextTokens === null ? "—" : count(contextTokens),
+    },
+    {
+      label: "ROUTER-REPORTED COST",
+      value: routerCost,
+    },
+    {
+      label: "RESPONSE MODEL",
+      value: inspectorText(route.response_model),
+    },
+  ];
+  const confidence =
+    confidenceLabel(route.confidence) ||
+    compactText(firstReported(route.confidence, ""), 80) ||
+    "Not reported";
+  const ranking = readableValue(
+    route.decision_ranking,
+    "No candidate ranking was reported by the router.",
+  );
+  const selectedModelId = compactText(route.model, 220);
+  const modelLabel = selectedModelId
+    ? info.label
+    : guard
+      ? "vLLM-SR safety guard"
+      : "Not reported";
+  const modelLocation = guard
+    ? "Policy layer · before model generation"
+    : info.location;
+  const callId = record.callId || normalizeCallId(route.call_id);
+  const errorText = readableValue(
+    firstReported(errorEvent.error, route.error),
+    "",
+    1800,
+  );
+  const correlationNote = record.request
+    ? `Request context and routing result correlated by call_id ${callId || "not reported"}.`
+    : callId
+      ? `No matching llm.request event was received for call_id ${callId}; route-only fields are shown.`
+      : "This route did not include a call_id, so request context could not be correlated.";
+  const steps = routeExplanationSteps(record);
+
+  $("route-inspector-title").textContent = guard
+    ? "Safety guard decision"
+    : `${modelLabel} route`;
+  $("route-inspector-summary").textContent =
+    `${agent.label} · ${narrative.label} · ${effort.label} reasoning`;
+  $("route-inspector-call-id").textContent = callId
+    ? `MODEL ROUTE · CALL ${callId}`
+    : "MODEL ROUTE · CALL ID NOT REPORTED";
+  $("route-inspector-content").innerHTML = `
+    <section class="inspector-hero" style="--route-accent:${info.color}">
+      <div class="inspector-model">
+        <span>SELECTED MODEL</span>
+        <h3>${escapeHtml(modelLabel)}</h3>
+        <p>
+          ${escapeHtml(modelLocation)}
+          ${
+            selectedModelId && selectedModelId !== modelLabel
+              ? `<small>${escapeHtml(selectedModelId)}</small>`
+              : ""
+          }
+        </p>
+      </div>
+      <span class="inspector-decision">${escapeHtml(narrative.label)}</span>
+    </section>
+
+    ${
+      guard
+        ? `<div class="inspector-alert guard" role="note">
+             <strong>Safety guard route</strong>
+             <span>Normal generation routing was intercepted by policy.</span>
+           </div>`
+        : ""
+    }
+    ${
+      errorText
+        ? `<div class="inspector-alert error" role="note">
+             <strong>Model call error</strong>
+             <span>${escapeHtml(errorText)}</span>
+           </div>`
+        : ""
+    }
+
+    <section class="inspector-overview" aria-label="Routing summary">
+      <article>
+        <small>AGENT IDENTITY</small>
+        <strong>${escapeHtml(agent.label)}</strong>
+        <span>${escapeHtml(agent.detail)}</span>
+      </article>
+      <article>
+        <small>DECISION</small>
+        <strong>${escapeHtml(narrative.label)}</strong>
+        <span>${escapeHtml(
+          compactText(route.decision, 100) || "Decision key not reported",
+        )}</span>
+      </article>
+      <article>
+        <small>REASONING EFFORT</small>
+        <strong>${escapeHtml(effort.label)}</strong>
+        <span>Configured by the router</span>
+      </article>
+      <article>
+        <small>ROUTER CONFIDENCE</small>
+        <strong>${escapeHtml(confidence)}</strong>
+        <span>Selected-route confidence</span>
+      </article>
+    </section>
+
+    <section class="inspector-section" aria-labelledby="inspector-request-heading">
+      <div class="inspector-section-heading">
+        <div>
+          <span>REQUEST CONTEXT</span>
+          <h3 id="inspector-request-heading">What the model call received</h3>
+        </div>
+        <span class="inspector-tool-count">${
+          toolCount === null
+            ? "TOOLS · NOT REPORTED"
+            : `TOOLS · ${count(toolCount)}`
+        }</span>
+      </div>
+      <div class="inspector-prompt-grid">
+        <article>
+          <h4>Prompt sent to the model</h4>
+          <pre>${escapeHtml(prompt)}</pre>
+        </article>
+        <article class="inspector-summary-card">
+          <h4>Conversation summary</h4>
+          ${renderMessagesSummary(messagesSummary)}
+        </article>
+      </div>
+      <div class="inspector-tools">
+        <div>
+          <h4>Declared tools</h4>
+          <span>${
+            toolCount === null
+              ? "Count not reported"
+              : `${count(toolCount)} ${toolCount === 1 ? "tool" : "tools"} available`
+          }</span>
+        </div>
+        ${
+          toolNames.length
+            ? `<div class="chips">
+                 ${toolNames
+                   .map(
+                     (name) =>
+                       `<span class="chip">${escapeHtml(name)}</span>`,
+                   )
+                   .join("")}
+               </div>`
+            : `<p>${
+                toolCount === 0
+                  ? "No tools were declared for this model call."
+                  : "Declared tool names were not reported."
+              }</p>`
+        }
+      </div>
+      ${renderInspectorMetadata(requestMetadata, "request")}
+      <p class="inspector-correlation ${record.request ? "matched" : "warning"}">
+        ${escapeHtml(correlationNote)}
+      </p>
+    </section>
+
+    <section class="inspector-section" aria-labelledby="inspector-signals-heading">
+      <div class="inspector-section-heading">
+        <div>
+          <span>ROUTING EVIDENCE</span>
+          <h3 id="inspector-signals-heading">Matched router signals</h3>
+        </div>
+      </div>
+      <div class="inspector-signal-grid">
+        ${renderInspectorSignalGroup(
+          "Semantic signals",
+          route.decision_signals,
+          "semantic",
+        )}
+        ${renderInspectorSignalGroup(
+          "Conversation signals",
+          route.conversation_signals,
+          "conversation",
+        )}
+        ${renderInspectorSignalGroup(
+          "Projection signals",
+          route.projection_signals,
+          "projection",
+        )}
+        ${renderInspectorSignalGroup(
+          "Keyword signals",
+          route.keyword_signals,
+          "keyword",
+        )}
+      </div>
+      <div class="inspector-ranking-grid">
+        <article class="inspector-confidence">
+          <span>ROUTER CONFIDENCE</span>
+          <strong>${escapeHtml(confidence)}</strong>
+          <p>Confidence reported for the selected routing decision.</p>
+        </article>
+        <article class="inspector-ranking">
+          <span>CANDIDATE RANKING</span>
+          <pre>${escapeHtml(ranking)}</pre>
+        </article>
+      </div>
+      <div class="inspector-router-trace">
+        <h4>Router trace metadata</h4>
+        ${renderInspectorMetadata(routerMetadata, "router")}
+      </div>
+    </section>
+
+    <section class="inspector-section" aria-labelledby="inspector-telemetry-heading">
+      <div class="inspector-section-heading">
+        <div>
+          <span>CALL TELEMETRY</span>
+          <h3 id="inspector-telemetry-heading">Usage, latency, and cloud cost</h3>
+        </div>
+      </div>
+      <div class="inspector-metric-grid">
+        <article><small>TOOLS AVAILABLE</small><strong>${
+          toolCount === null ? "—" : count(toolCount)
+        }</strong></article>
+        <article><small>LATENCY</small><strong>${
+          latency === null ? "—" : `${Math.max(0, latency).toFixed(2)}s`
+        }</strong></article>
+        <article><small>CLOUD API COST*</small><strong>${
+          cloudCost === null ? "—" : money(cloudCost)
+        }</strong></article>
+        <article><small>TOTAL TOKENS</small><strong>${
+          totalTokens === null ? "—" : count(totalTokens)
+        }</strong></article>
+        <article><small>PROMPT TOKENS</small><strong>${
+          promptTokens === null ? "—" : count(promptTokens)
+        }</strong></article>
+        <article><small>OUTPUT TOKENS</small><strong>${
+          completionTokens === null ? "—" : count(completionTokens)
+        }</strong></article>
+        <article><small>CACHED TOKENS</small><strong>${
+          cachedTokens === null ? "—" : count(cachedTokens)
+        }</strong></article>
+        <article><small>REASONING TOKENS</small><strong>${
+          reasoningTokens === null ? "—" : count(reasoningTokens)
+        }</strong></article>
+      </div>
+      <p class="inspector-cost-note">
+        * Cloud token/API estimate only. Local AMD Instinct hardware and
+        operating costs are outside this value.
+      </p>
+    </section>
+
+    <section class="inspector-section inspector-explanation"
+             aria-labelledby="inspector-explanation-heading">
+      <div class="inspector-section-heading">
+        <div>
+          <span>PLAIN-LANGUAGE TRACE</span>
+          <h3 id="inspector-explanation-heading">Why this route won</h3>
+        </div>
+      </div>
+      <ol>
+        ${steps
+          .map(
+            (step) => `
+              <li>
+                <span aria-hidden="true"></span>
+                <p>${escapeHtml(step)}</p>
+              </li>`,
+          )
+          .join("")}
+      </ol>
+      <p class="inspector-explanation-note">
+        This explanation is assembled from reported router metadata. It
+        describes the routing policy and does not expose private model
+        chain-of-thought.
+      </p>
+    </section>
+  `;
+}
+
+function openRouteInspector(routeId, trigger) {
+  const record = state.routeRecords.get(String(routeId || ""));
+  if (!record?.route) return;
+  const modal = $("route-inspector");
+  state.activeRouteId = record.routeId;
+  state.routeTrigger =
+    trigger instanceof HTMLElement ? trigger : document.activeElement;
+  renderRouteInspector(record);
+  document.body.classList.add("route-inspector-open");
+  if (!modal.open) {
+    if (typeof modal.showModal === "function") {
+      modal.showModal();
+    } else {
+      modal.setAttribute("open", "");
+    }
+  }
+  $("route-inspector-announcer").textContent =
+    `Opened routing decision inspector for ${
+      modelInfo(record.route.model, record.route.model_info).label
+    }.`;
+  window.requestAnimationFrame(() => {
+    $("route-inspector-close").focus();
+  });
+}
+
+function closeRouteInspector({ restoreFocus = true } = {}) {
+  const modal = $("route-inspector");
+  if (!modal) return;
+  const trigger = state.routeTrigger;
+  state.activeRouteId = null;
+  state.routeTrigger = null;
+  document.body.classList.remove("route-inspector-open");
+  if (modal.open && typeof modal.close === "function") {
+    modal.close();
+  } else {
+    modal.removeAttribute("open");
+  }
+  $("route-inspector-announcer").textContent = "";
+  if (
+    restoreFocus &&
+    trigger instanceof HTMLElement &&
+    trigger.isConnected
+  ) {
+    window.requestAnimationFrame(() => {
+      trigger.focus({ preventScroll: true });
+    });
+  }
+}
+
+function handleRouteInspectorTrigger(event) {
+  const target =
+    event.target instanceof Element
+      ? event.target.closest("[data-route-id]")
+      : null;
+  if (!target) return;
+  openRouteInspector(target.dataset.routeId, target);
+}
+
+function handleRouteInspectorKeydown(event) {
+  const modal = $("route-inspector");
+  if (!modal.open && !modal.hasAttribute("open")) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeRouteInspector();
+    return;
+  }
+  if (event.key !== "Tab") return;
+  const focusable = [...modal.querySelectorAll(
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+  )].filter((element) => !element.hidden);
+  if (!focusable.length) {
+    event.preventDefault();
+    modal.focus();
+    return;
+  }
+  const first = focusable[0];
+  const last = focusable.at(-1);
+  if (event.shiftKey && document.activeElement === first) {
+    event.preventDefault();
+    last.focus();
+  } else if (!event.shiftKey && document.activeElement === last) {
+    event.preventDefault();
+    first.focus();
+  }
 }
 
 function updateMetrics(metrics) {
@@ -1347,6 +2240,23 @@ $("run-button").addEventListener("click", () => {
 $("clear-button").addEventListener("click", () => {
   void handleSecondaryAction();
 });
+
+$("timeline").addEventListener("click", handleRouteInspectorTrigger);
+$("route-detail").addEventListener("click", handleRouteInspectorTrigger);
+$("route-inspector-close").addEventListener("click", () => {
+  closeRouteInspector();
+});
+$("route-inspector").addEventListener("click", (event) => {
+  if (event.target === $("route-inspector")) closeRouteInspector();
+});
+$("route-inspector").addEventListener("cancel", (event) => {
+  event.preventDefault();
+  closeRouteInspector();
+});
+$("route-inspector").addEventListener(
+  "keydown",
+  handleRouteInspectorKeydown,
+);
 
 window.addEventListener("beforeunload", () => {
   if (state.eventSource) state.eventSource.close();

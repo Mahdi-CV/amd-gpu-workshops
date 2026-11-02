@@ -12,6 +12,12 @@ while one UI explains:
 - counterfactual cost if every call used premium Kimi K3;
 - a secondary comparison against all GLM-5.3-Flash.
 
+Every routed-call card is clickable. The inspector correlates the model
+request and routing result by call ID, then shows the bounded prompt,
+conversation outline, declared tools, matched signals, candidate evidence,
+reasoning effort, token usage, latency, and cloud API estimate. System
+instructions and private model chain-of-thought are not exposed.
+
 ## Model pool
 
 | Tier | Runtime | Model | Intended work |
@@ -44,6 +50,17 @@ public UI is reverse-proxied through Caddy:
 
 ```text
 https://agent.165.245.129.230.sslip.io
+```
+
+## Booth teaser
+
+The `video/` directory contains the deterministic 60-second silent-first booth
+loop, its 1920×1080 poster, storyboard, animation source, and render tooling:
+
+```bash
+cd video
+./render.sh
+./validate_video.py amd-booth-teaser.mp4 --decode
 ```
 
 ## Four-hour soak

@@ -46,6 +46,57 @@ def test_reasoning_effort_reports_selected_policy_not_projection():
     assert app.parse_effort(headers) == "high"
 
 
+def test_trace_summary_hides_system_and_lists_declared_tools():
+    messages = [
+        {"role": "system", "content": "secret internal instructions"},
+        {"role": "user", "content": "Inspect the benchmark and fix it."},
+        {
+            "role": "tool",
+            "tool_call_id": "call-1",
+            "content": "4 failed, 1 passed",
+        },
+    ]
+    summary = app.summarize_messages(messages)
+    assert summary[0]["preview"] == "[system instructions hidden]"
+    assert "secret" not in json.dumps(summary)
+    assert app.latest_prompt(messages) == "4 failed, 1 passed"
+    assert app.latest_prompt(
+        [{"role": "user", "content": "Fix this:\n\n```python\nreturn 1\n```"}]
+    ) == "Fix this:\n\n```python\nreturn 1\n```"
+    tools = [
+        {
+            "type": "function",
+            "function": {"name": "inspect_file"},
+        },
+        {
+            "type": "function",
+            "function": {"name": "inspect_file"},
+        },
+        {
+            "type": "function",
+            "function": {"name": "run_tests"},
+        },
+    ]
+    assert app.declared_tool_names(tools) == ["inspect_file", "run_tests"]
+
+
+def test_tool_bridge_event_exposes_nested_tool_name():
+    event = app.normalized_tool_event(
+        {
+            "name": "tool_call",
+            "arguments": json.dumps(
+                {
+                    "id": "openclaw:core:sessions_spawn",
+                    "args": {"agentId": "reviewer"},
+                }
+            ),
+        }
+    )
+    assert event["name"] == "sessions_spawn"
+    assert event["bridge_tool_id"] == "openclaw:core:sessions_spawn"
+    assert "reviewer" in event["arguments"]
+
+
 def test_costs_use_cached_and_uncached_rates():
     usage = {
         "prompt_tokens": 1000,
@@ -72,6 +123,8 @@ def test_run_metrics_report_both_counterfactuals(tmp_path):
     metrics = run.metrics()
     assert metrics["savings_vs_kimi_percent"] == 90.0
     assert metrics["savings_vs_glm_percent"] == 50.0
+    run.model_counts["qwen/qwen3.8-27b"] = 3
+    assert metrics["model_counts"]["qwen/qwen3.8-27b"] == 2
 
 
 def test_final_text_from_history_uses_response_after_latest_yield():
