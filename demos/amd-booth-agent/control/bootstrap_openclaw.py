@@ -204,7 +204,13 @@ def install_role_files() -> None:
             encoding="utf-8",
         )
         (workspace / "USER.md").write_text(
-            "# User\n\nPrefer useful booth-sized results with visible verification.\n",
+            (
+                "# User\n\n"
+                "Prefer direct answers for self-contained tasks. Use visible "
+                "verification and artifacts when the task changes files, "
+                "depends on external information, or explicitly requests "
+                "them.\n"
+            ),
             encoding="utf-8",
         )
         (workspace / "BOOTSTRAP.md").unlink(missing_ok=True)

@@ -18,6 +18,10 @@ conversation outline, declared tools, matched signals, candidate evidence,
 reasoning effort, token usage, latency, and cloud API estimate. System
 instructions and private model chain-of-thought are not exposed.
 
+The coordinator answers self-contained requests directly. It uses tools,
+subagents, verification, and artifacts only when the task requires external
+state or explicitly asks for those actions.
+
 ## Model pool
 
 | Tier | Runtime | Model | Intended work |
