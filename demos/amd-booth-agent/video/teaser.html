@@ -134,7 +134,6 @@
       }
 
       .brand-left,
-      .brand-right,
       .footer-flow,
       .model-location,
       .live-pill,
@@ -186,27 +185,12 @@
         letter-spacing: -0.01em;
       }
 
-      .brand-right {
-        gap: 16px;
-        color: var(--muted);
-        font-size: 13px;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        text-transform: uppercase;
-      }
-
       .live-dot {
         width: 10px;
         height: 10px;
         border-radius: 50%;
         background: var(--green);
         box-shadow: 0 0 0 6px rgba(86, 216, 144, 0.1);
-      }
-
-      .time-code {
-        min-width: 54px;
-        color: white;
-        font-variant-numeric: tabular-nums;
       }
 
       .progress-track {
@@ -1550,10 +1534,36 @@
       }
 
       .cta-lockup {
-        width: 380px;
-        height: auto;
-        margin-bottom: 37px;
+        width: min(880px, 72vw);
+        min-height: 104px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 42px;
+        margin: 0 auto 37px;
         opacity: 0;
+      }
+
+      .cta-lockup img {
+        display: block;
+        width: auto;
+        object-fit: contain;
+      }
+
+      .cta-brand-amd {
+        height: 76px;
+      }
+
+      .cta-brand-fireworks {
+        height: 94px;
+        max-width: 430px;
+      }
+
+      .cta-partner-mark {
+        color: rgba(255, 255, 255, 0.7);
+        font-size: 58px;
+        font-weight: 300;
+        line-height: 1;
       }
 
       .cta h2 {
@@ -1633,13 +1643,6 @@
             <small>AMD INSTINCT™ AI EXPERIENCE</small>
             <strong>Open Agent Studio</strong>
           </div>
-        </div>
-        <div class="brand-right">
-          <span class="live-dot" id="header-live-dot" aria-hidden="true"></span>
-          <span>Live system</span>
-          <span>·</span>
-          <span>60 sec demo loop</span>
-          <span class="time-code" id="time-code">00:00</span>
         </div>
       </header>
       <div class="progress-track" id="progress-track" aria-hidden="true">
@@ -2090,12 +2093,24 @@
           aria-label="Build a flexible mixture of models"
         >
           <div class="cta-content">
-            <img
+            <div
               class="cta-lockup"
               id="cta-lockup"
-              src="../control/static/amd-lockup-white.png"
-              alt="AMD — together we advance"
-            />
+              role="img"
+              aria-label="AMD and Fireworks AI"
+            >
+              <img
+                class="cta-brand-amd"
+                src="../control/static/amd-logo-white.png"
+                alt="AMD"
+              />
+              <span class="cta-partner-mark" aria-hidden="true">×</span>
+              <img
+                class="cta-brand-fireworks"
+                src="../control/static/fireworks-logo-white.svg"
+                alt="Fireworks AI"
+              />
+            </div>
             <h2 id="cta-title">
               BUILD YOUR OWN<br /><span class="red">MIXTURE OF MODELS.</span>
             </h2>
@@ -2441,13 +2456,10 @@
           setScene("scene-cta", t, 54.8, 60.0, 0.55, 0.0);
 
           $("progress-fill").style.width = `${(t / DURATION) * 100}%`;
-          $("time-code").textContent = `00:${String(Math.floor(t)).padStart(2, "0")}`;
           const chromeOpacity = 1 - ramp(t, 46.55, 0.65);
           $("brandbar").style.opacity = chromeOpacity.toFixed(4);
           $("progress-track").style.opacity = chromeOpacity.toFixed(4);
           $("footer-flow").style.opacity = chromeOpacity.toFixed(4);
-          const headerPulse = 1 + Math.sin(t * 4.2) * 0.05;
-          $("header-live-dot").style.transform = `scale(${headerPulse.toFixed(4)})`;
 
           $("ambient-one").style.transform =
             `translate3d(${Math.sin(t * 0.31) * 28}px, ${Math.cos(t * 0.23) * 18}px, 0)`;

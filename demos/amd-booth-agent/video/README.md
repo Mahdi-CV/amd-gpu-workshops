@@ -3,6 +3,12 @@
 This directory contains a silent-first, deterministic 60-second teaser for the
 AMD OpenClaw + vLLM Semantic Router live booth demo.
 
+The audience-facing render has no top-right live-system or loop-duration status
+label. Its 55–60 second closing hold uses an **AMD × Fireworks AI** co-brand
+lockup while retaining the provider-neutral message: one endpoint can route
+across a configurable mixture of local, cloud, and specialist models to retain
+accuracy targets and save inference cost.
+
 ## Deliverables
 
 - `amd-booth-teaser.mp4` — rendered 1920×1080 H.264/AAC booth loop.
