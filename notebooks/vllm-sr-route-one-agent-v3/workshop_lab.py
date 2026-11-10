@@ -67,10 +67,10 @@ class WorkshopLab:
             "REASONING_ENDPOINT", f"http://{host}:8001"
         )
         self.routine_provider_model = os.getenv(
-            "ROUTINE_PROVIDER_MODEL", "gemma-4-12b"
+            "ROUTINE_PROVIDER_MODEL", "FW-Qwen3.8-27B"
         )
         self.reasoning_provider_model = os.getenv(
-            "REASONING_PROVIDER_MODEL", "qwen3.8-27b"
+            "REASONING_PROVIDER_MODEL", "FW-GLM-5.3-Flash"
         )
         self.virtual_model = "vllm-sr/auto"
 
