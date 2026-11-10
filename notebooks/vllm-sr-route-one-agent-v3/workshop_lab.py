@@ -150,6 +150,7 @@ class WorkshopLab:
             capture_output=True,
             text=True,
             timeout=300,
+            start_new_session=True,
         )
         if result.stdout:
             print(result.stdout)
