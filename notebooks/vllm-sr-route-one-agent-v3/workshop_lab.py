@@ -56,9 +56,10 @@ class WorkshopLab:
         self.management_api = os.getenv(
             "ROUTER_MANAGEMENT_API", f"http://{host}:8080"
         )
-        self.dashboard_url = os.getenv("DASHBOARD_URL", f"http://{host}:8700")
+        self.dashboard_url = os.getenv("DASHBOARD_URL", f"http://{host}:9000")
         self.dashboard_browser_url = os.getenv(
-            "DASHBOARD_BROWSER_URL", "http://localhost:8700"
+            "DASHBOARD_BROWSER_URL",
+            os.getenv("APP_URL", "http://localhost:9000"),
         )
         self.routine_endpoint = os.getenv(
             "ROUTINE_ENDPOINT", f"http://{host}:8002"
