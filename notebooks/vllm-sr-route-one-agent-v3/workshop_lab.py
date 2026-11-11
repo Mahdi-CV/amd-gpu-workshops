@@ -143,13 +143,13 @@ class WorkshopLab:
             print(f"The workshop image must provide: {script}")
             return self.status()
 
-        print("Starting the Router, Envoy, and Dashboard...")
+        print("Starting the Foundry relay, the Router (d3-lite) and the Dashboard...")
         result = subprocess.run(
             [str(script)],
             check=False,
             capture_output=True,
             text=True,
-            timeout=300,
+            timeout=900,
             start_new_session=True,
         )
         if result.stdout:
@@ -261,10 +261,6 @@ class WorkshopLab:
             "response_model": body.get("model"),
             "decision": response.headers.get("x-vsr-selected-decision"),
             "selected_model": response.headers.get("x-vsr-selected-model"),
-            "algorithm": response.headers.get("x-vsr-selected-algorithm"),
-            "matched_complexity": response.headers.get(
-                "x-vsr-matched-complexity"
-            ),
             "replay_id": response.headers.get("x-vsr-replay-id"),
             "latency_seconds": round(elapsed, 3),
             "answer": WorkshopLab._answer_text(message),
@@ -285,7 +281,11 @@ class WorkshopLab:
 
     def active_decisions(self) -> list[str]:
         config = self.active_config()
-        decisions = config.get("routing", {}).get("decisions", [])
+        decisions = [
+            decision
+            for recipe in config.get("recipes") or []
+            for decision in recipe.get("decisions") or []
+        ]
         return [
             decision.get("name")
             for decision in decisions
@@ -326,6 +326,7 @@ class WorkshopLab:
             max_tokens=max_tokens,
             debug=True,
         )
+        result.update(self._complexity_from_replay(result.get("replay_id")))
         print(pformat(result))
         return result
 
@@ -361,14 +362,12 @@ class WorkshopLab:
         history_answer = message.get("content") or ""
         observed = {
             "prompt": prompt,
-            "matched_complexity": response.headers.get(
-                "x-vsr-matched-complexity"
-            ),
             "decision": response.headers.get("x-vsr-selected-decision"),
             "selected_model": response.headers.get("x-vsr-selected-model"),
             "replay_id": response.headers.get("x-vsr-replay-id"),
             "answer": self._answer_text(message),
         }
+        observed.update(self._complexity_from_replay(observed["replay_id"]))
         print(
             pformat(
                 {
@@ -399,6 +398,7 @@ class WorkshopLab:
                 {
                     **item,
                     "observed_complexity": observed.get("matched_complexity"),
+                    "observed_probabilities": observed.get("complexity_probabilities"),
                     "observed_decision": observed.get("decision"),
                     "observed_model": observed.get("selected_model"),
                     "replay_id": observed.get("replay_id"),
@@ -406,47 +406,92 @@ class WorkshopLab:
             )
         return results
 
-    def replay_signal_values(self, replay_id: str) -> dict[str, float]:
-        """Fetch raw signal values for one request from Router Replay."""
+    def replay_record(self, replay_id: str, attempts: int = 10) -> dict:
+        """Read one Router Replay record (the Router writes it as the request completes)."""
         if not replay_id:
             raise ValueError("The response did not include x-vsr-replay-id.")
-        paths = (
-            f"{self.router_api.rstrip('/')}/v1/router_replay/{replay_id}",
-            f"{self.management_api.rstrip('/')}/v1/router_replay/{replay_id}",
+        url = (
+            f"{self.management_api.rstrip('/')}"
+            f"/api/v1/observability/replays/{replay_id}"
         )
-        failures = []
-        for url in paths:
+        last = ""
+        for _ in range(attempts):
             try:
                 response = requests.get(url, timeout=15)
-                if not response.ok:
-                    failures.append(f"{url}: HTTP {response.status_code}")
-                    continue
-                body = response.json()
-                record = body.get("data", body)
-                values = record.get("signal_values", {})
-                if values:
-                    return values
-                failures.append(f"{url}: response contained no signal_values")
+                if response.ok:
+                    body = response.json()
+                    return body.get("data", body)
+                last = f"HTTP {response.status_code}"
             except (requests.RequestException, ValueError) as exc:
-                failures.append(f"{url}: {exc}")
-        raise RuntimeError(
-            "Router Replay did not return signal values. Confirm the pinned "
-            "workshop runtime exposes /v1/router_replay and that "
-            "global.services.router_replay.enabled is true.\n"
-            + "\n".join(failures)
-        )
+                last = str(exc)
+            time.sleep(0.3)
+        raise RuntimeError(f"Router Replay has no record {replay_id}: {last}")
+
+    def replay_signal_values(self, replay_id: str) -> dict[str, float]:
+        """Fetch raw signal values for one request from Router Replay."""
+        values = self.replay_record(replay_id).get("signal_values") or {}
+        if not values:
+            raise RuntimeError(
+                f"Router Replay record {replay_id} contains no signal values."
+            )
+        return values
+
+    def _complexity_from_replay(self, replay_id: str | None) -> dict:
+        """The complexity label d3-lite reported, and its three probabilities."""
+        if not replay_id:
+            return {"matched_complexity": None}
+        try:
+            record = self.replay_record(replay_id)
+        except (RuntimeError, ValueError):
+            return {"matched_complexity": None}
+        labels = (record.get("signals") or {}).get("complexity") or []
+        values = record.get("signal_values") or {}
+        prefix = "complexity:request_complexity:"
+        return {
+            "matched_complexity": labels[0].rsplit(":", 1)[-1] if labels else None,
+            "complexity_probabilities": {
+                level: round(values[prefix + level], 3)
+                for level in ("easy", "medium", "hard")
+                if prefix + level in values
+            },
+        }
 
     def complexity_evidence(self, routed_result: dict) -> dict[str, float]:
-        """Print the easy score, hard score, and margin for one request."""
+        """Print the easy, medium and hard probabilities d3-lite gave one request."""
         values = self.replay_signal_values(routed_result.get("replay_id"))
         prefix = "complexity:request_complexity:"
         evidence = {
-            "hard_score": values.get(prefix + "text_hard_score"),
-            "easy_score": values.get(prefix + "text_easy_score"),
-            "margin": values.get(prefix + "text_margin"),
+            level: values.get(prefix + level) for level in ("easy", "medium", "hard")
         }
         print(pformat(evidence))
         return evidence
+
+    def deploy_policy(self, policy_path: Path, recipe: str = "default") -> list[str]:
+        """Make a routing policy (signals + decisions) active in the running Router.
+
+        Replaces one recipe through the Router management API, which validates the
+        policy, keeps a backup, and reloads without a restart. The version check
+        (If-Match) refuses the write if the recipe changed since it was read, for
+        example from the Dashboard; read it again and redeploy.
+        """
+        policy = yaml.safe_load(Path(policy_path).read_text(encoding="utf-8"))
+        url = f"{self.management_api.rstrip('/')}/api/v1/config/recipes/{recipe}"
+        current = requests.get(url, timeout=15)
+        current.raise_for_status()
+        response = requests.put(
+            url,
+            json={"name": recipe, "profile": policy},
+            headers={"If-Match": current.headers.get("ETag", "")},
+            timeout=60,
+        )
+        if not response.ok:
+            raise RuntimeError(
+                f"Deploy of {Path(policy_path).name} failed "
+                f"(HTTP {response.status_code}):\n{response.text[:2000]}"
+            )
+        active = self.active_decisions()
+        print(f"✓ Deployed {Path(policy_path).name}; active decisions: {active}")
+        return active
 
     def agent_command(self, task: str) -> str:
         command = f'hermes -z {json.dumps(task)} --yolo'
