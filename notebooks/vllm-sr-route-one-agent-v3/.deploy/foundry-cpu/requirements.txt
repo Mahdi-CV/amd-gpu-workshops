@@ -1,0 +1,9 @@
+# Workshop Python environment (/opt/workshop-venv): what the notebook and its agent use.
+# requirements.lock pins every transitive dependency and is used when present.
+vllm-sr==0.5.0.dev20261110170302   # config validation in the notebook (matches the router image)
+hermes-agent==0.19.0               # the coding agent of Section 5
+jupyterlab==4.6.3
+ihighlight==1.0.0                  # cell colours by run status
+pytest                             # the agent's task runs the demo's tests
+requests
+PyYAML==6.0.3
