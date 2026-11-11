@@ -170,6 +170,9 @@ class WorkshopLab:
         return services
 
     def browser_links(self) -> None:
+        """Show the Dashboard link and its login (u: username, p: password)."""
+        email = os.getenv("DASHBOARD_ADMIN_EMAIL", "admin@workshop.local")
+        password = os.getenv("DASHBOARD_ADMIN_PASSWORD", "workshop2026")
         try:
             from IPython.display import HTML, display
 
@@ -186,7 +189,10 @@ class WorkshopLab:
                 )
             )
         except ImportError:
-            print("Dashboard:", self.dashboard_browser_url)
+            pass
+        print("Dashboard:", self.dashboard_browser_url)
+        print("u:", email)
+        print("p:", password)
 
     @staticmethod
     def _models(endpoint: str) -> list[str]:
