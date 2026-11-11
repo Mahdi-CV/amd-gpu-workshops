@@ -5,10 +5,13 @@ OpenAI-style requests to Azure Foundry with the API key attached, so the router
 and notebook run unchanged on a CPU-only lab VM. Standard library only.
 
 Env:
-  FOUNDRY_ENDPOINT     e.g. https://<resource>.services.ai.azure.com  (required)
+  FOUNDRY_ENDPOINT     the chat-completions URL, or its base (required). Accepted forms:
+                         https://<host>/<prefix>/v1/chat/completions   used as is
+                         https://<host>/<prefix>/v1                    /chat/completions added
+                         https://<host>                                /openai/v1/chat/completions added
+                       A ?api-version=... query is kept; surrounding quotes are ignored.
   FOUNDRY_API_KEY      the key from the lab instructions panel         (required)
-  FOUNDRY_PATH         chat path appended to the endpoint
-                       (default /openai/v1/chat/completions)
+  FOUNDRY_PATH         optional path appended to the endpoint instead of the above
   ROUTINE_DEPLOYMENT   Foundry deployment for port 8002 (default FW-Qwen3.8-27B)
   REASONING_DEPLOYMENT Foundry deployment for port 8001 (default FW-GLM-5.3-Flash)
   ROUTINE_PROVIDER_MODEL / REASONING_PROVIDER_MODEL
@@ -29,13 +32,30 @@ import time
 import urllib.error
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from urllib.parse import urlsplit
 
-ENDPOINT = os.environ.get("FOUNDRY_ENDPOINT", "").strip().rstrip("/")
-API_KEY = os.environ.get("FOUNDRY_API_KEY", "").strip()
-CHAT_PATH = os.environ.get("FOUNDRY_PATH", "/openai/v1/chat/completions")
-# The lab panel gives the full chat URL; accept that as well as a bare resource URL.
-if ENDPOINT.endswith("/chat/completions"):
-    CHAT_PATH = ""
+def chat_url(endpoint, path=""):
+    """The full chat-completions URL from FOUNDRY_ENDPOINT (and FOUNDRY_PATH, if set)."""
+    endpoint = endpoint.strip().strip("\"'").strip()
+    base, sep, query = endpoint.partition("?")
+    base = base.rstrip("/")
+    if not base:
+        return ""
+    if base.endswith("/chat/completions"):
+        url = base                                   # the full URL
+    elif path:
+        url = base + "/" + path.lstrip("/")          # an explicit FOUNDRY_PATH
+    elif urlsplit(base).path in ("", "/"):
+        url = base + "/openai/v1/chat/completions"   # a bare resource URL
+    else:
+        url = base + "/chat/completions"             # a base such as .../openai/v1
+    return url + (sep + query if query else "")
+
+
+# ENDPOINT is the complete URL; CHAT_PATH stays for older diagnostics (ENDPOINT + CHAT_PATH).
+ENDPOINT = chat_url(os.environ.get("FOUNDRY_ENDPOINT", ""), os.environ.get("FOUNDRY_PATH", ""))
+CHAT_PATH = ""
+API_KEY = os.environ.get("FOUNDRY_API_KEY", "").strip().strip("\"'").strip()
 
 # vLLM-only request fields. The notebook and the router send some of these to the local
 # servers (e.g. chat_template_kwargs to switch thinking off); Azure may reject unknown fields.
@@ -346,6 +366,7 @@ def make_handler(port):
 def main():
     if not ENDPOINT or not API_KEY:
         sys.exit("Set FOUNDRY_ENDPOINT and FOUNDRY_API_KEY (both are in the lab instructions panel).")
+    print(f"Foundry chat URL: {ENDPOINT}", flush=True)
     servers = [ThreadingHTTPServer(("127.0.0.1", p), make_handler(p)) for p in ROUTES]
     for p, (dep, name) in ROUTES.items():
         tools_dep = TOOLS_DEPLOYMENT.get(p) or dep
