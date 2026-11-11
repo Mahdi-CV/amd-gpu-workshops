@@ -24,7 +24,7 @@ LAB_USER="${LAB_USER:-${SUDO_USER:-}}"
 LAB_HOME="$(getent passwd "$LAB_USER" | cut -d: -f6)"
 [ -d "$LAB_HOME" ] || { echo "no home directory for $LAB_USER"; exit 1; }
 
-# setup.sh (sha f8a02e712fb7); written in place so its owner stays the lab user.
+# setup.sh (sha 0c1a6b004ceb); written in place so its owner stays the lab user.
 cat > "$LAB_HOME/setup.sh" <<'VLLM_SR_SETUP_SH'
 #!/usr/bin/env bash
 # vLLM-SR workshop on a CPU-only lab VM: model lanes on Azure Foundry, d3-lite routing on the CPU.
@@ -32,7 +32,7 @@ cat > "$LAB_HOME/setup.sh" <<'VLLM_SR_SETUP_SH'
 set -euo pipefail
 
 # The tested workshop image, pinned by digest (Router, Dashboard, d3-lite, relay, JupyterLab, Hermes).
-IMAGE='mahatri/vllm-sr-agent-workshop@sha256:22965e265cba00861855ecb95013a6512da8a24207f108033755928d5d59752f'
+IMAGE='mahatri/vllm-sr-agent-workshop@sha256:82db07692d4ab1fb58a82d3a481c0bde8bf157845e9294a4b205f4fed2d19b0d'
 # Notebook files come from this branch (or a tag: REF=tags/<name>); if GitHub is unreachable,
 # the container uses the copy shipped in the image.
 OWNER='Mahdi-CV'; REPO='amd-gpu-workshops'
@@ -138,7 +138,7 @@ echo "Dashboard: http://localhost:9000"
 echo "Dashboard login: $DASH_EMAIL / $DASH_PASS"
 VLLM_SR_SETUP_SH
 chown "$LAB_USER": "$LAB_HOME/setup.sh"
-echo "setup.sh sha: $(sha256sum "$LAB_HOME/setup.sh" | cut -c1-12) (expected f8a02e712fb7)"
+echo "setup.sh sha: $(sha256sum "$LAB_HOME/setup.sh" | cut -c1-12) (expected 0c1a6b004ceb)"
 
 cat > /usr/local/bin/vllm-sr-lab-start <<'VLLM_SR_START'
 #!/usr/bin/env bash

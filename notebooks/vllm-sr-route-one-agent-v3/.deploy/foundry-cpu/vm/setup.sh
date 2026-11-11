@@ -4,7 +4,7 @@
 set -euo pipefail
 
 # The tested workshop image, pinned by digest (Router, Dashboard, d3-lite, relay, JupyterLab, Hermes).
-IMAGE='mahatri/vllm-sr-agent-workshop@sha256:22965e265cba00861855ecb95013a6512da8a24207f108033755928d5d59752f'
+IMAGE='mahatri/vllm-sr-agent-workshop@sha256:82db07692d4ab1fb58a82d3a481c0bde8bf157845e9294a4b205f4fed2d19b0d'
 # Notebook files come from this branch (or a tag: REF=tags/<name>); if GitHub is unreachable,
 # the container uses the copy shipped in the image.
 OWNER='Mahdi-CV'; REPO='amd-gpu-workshops'
