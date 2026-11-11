@@ -1,0 +1,85 @@
+version: v0.5
+listeners:
+  - name: workshop
+    address: 127.0.0.1
+    port: 8898
+    timeout: 600s
+providers:
+  models:
+    - name: routine-model
+      api_format: openai
+      provider_model_id: FW-Qwen3.8-27B
+      backend_refs:
+        - name: routine-backend
+          endpoint: 127.0.0.1:8002
+          protocol: http
+          weight: 1
+      context_window_size: 65536
+    - name: reasoning-model
+      api_format: openai
+      provider_model_id: FW-GLM-5.3-Flash
+      backend_refs:
+        - name: reasoning-backend
+          endpoint: 127.0.0.1:8001
+          protocol: http
+          weight: 1
+      context_window_size: 65536
+recipes:
+  - name: default
+    signals:
+      complexity:
+        - name: request_complexity
+          description: Separate direct requests from reasoning-heavy work.
+    decisions:
+      - name: reasoning-lane
+        description: Use the stronger model for medium and hard work.
+        priority: 200
+        rules:
+          operator: OR
+          conditions:
+            - type: complexity
+              name: request_complexity
+              label: hard
+            - type: complexity
+              name: request_complexity
+              label: medium
+        modelRefs:
+          - model: reasoning-model
+            use_reasoning: true
+        algorithm:
+          type: static
+      - name: routine-lane
+        description: Use the routine model for everything else.
+        priority: 100
+        rules:
+          operator: AND
+          conditions: []
+        modelRefs:
+          - model: routine-model
+        algorithm:
+          type: static
+global:
+  model_catalog:
+    deployments:
+      d3-lite:
+        provider: model_runtime
+        artifact: /opt/models/d3-lite
+        device: cpu
+        dtype: bfloat16
+        public_name: d3-lite
+    system:
+      decision_model: {deployment: d3-lite}
+  services:
+    management_api:
+      bind_address: 127.0.0.1
+      port: 8080
+      remote_exposure: false
+    router_replay:
+      store_backend: memory
+  plugins:
+    - type: router_replay
+      configuration:
+        enabled: true
+entrypoints:
+  - model_names: [vllm-sr/auto]
+    recipe: default
