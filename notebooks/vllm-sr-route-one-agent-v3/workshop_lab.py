@@ -318,7 +318,7 @@ class WorkshopLab:
             endpoint,
             model,
             prompt,
-            max_tokens=32,
+            max_tokens=400,
             extra_body=extra_body,
         )
         print(pformat(result))
@@ -340,7 +340,7 @@ class WorkshopLab:
         self,
         history: list[dict[str, str]],
         prompt: str,
-        max_tokens: int = 120,
+        max_tokens: int = 400,
     ) -> tuple[list[dict[str, str]], dict]:
         """Send one user turn while preserving the preceding conversation."""
         messages = [*history, {"role": "user", "content": prompt}]
@@ -399,7 +399,7 @@ class WorkshopLab:
             prediction = item["prediction"]
             print(f"\n{label}: {prompt}")
             print(f"Prediction: {prediction}")
-            observed = self.routed_chat(prompt, max_tokens=80)
+            observed = self.routed_chat(prompt, max_tokens=400)
             results.append(
                 {
                     **item,
