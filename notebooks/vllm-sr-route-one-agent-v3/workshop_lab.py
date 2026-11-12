@@ -219,6 +219,9 @@ class WorkshopLab:
     @staticmethod
     def _answer_text(message: dict) -> str:
         content = message.get("content")
+        # Some thinking models return their reasoning inline, ending in </think>; keep the answer.
+        if isinstance(content, str) and "</think>" in content:
+            content = content.rsplit("</think>", 1)[1].lstrip()
         if isinstance(content, str) and content.strip():
             return content
         if message.get("reasoning") or message.get("reasoning_content"):
