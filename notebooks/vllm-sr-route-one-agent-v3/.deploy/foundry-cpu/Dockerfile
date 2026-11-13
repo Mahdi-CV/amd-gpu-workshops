@@ -7,6 +7,7 @@
 #
 # Build from the notebook folder (notebooks/vllm-sr-route-one-agent-v3):
 #   bash .deploy/foundry-cpu/fetch-d3-lite.sh
+#   bash .deploy/foundry-cpu/fetch-vela3-fast.sh
 #   docker build -f .deploy/foundry-cpu/Dockerfile -t <image> .
 
 # vLLM-SR at commit 6b782822 (the CLI 0.5.0.dev20261110170302 runs exactly these images).
@@ -41,8 +42,11 @@ RUN python3 -m venv /opt/workshop-venv \
 COPY --from=dashboard /usr/local/bin/dashboard-backend /usr/local/bin/dashboard-backend
 COPY --from=dashboard /app/frontend /opt/vllm-sr-dashboard/frontend
 
-# d3-lite, served from this path; the router never contacts Hugging Face.
+# Decision models, served from these paths; the router never contacts Hugging Face.
+# d3-lite answers the workshop's complexity signal. vela3-fast answers the built-in signals
+# (PII, jailbreak, domain, ...) and is loaded only when a signal is bound to it.
 COPY .deploy/foundry-cpu/models/d3-lite /opt/models/d3-lite
+COPY --exclude=SHA256SUMS .deploy/foundry-cpu/models/vela3-fast /opt/models/vela3-fast
 
 # JupyterLab terminals open a bash login shell instead of sh (dash).
 RUN mkdir -p /opt/workshop-venv/etc/jupyter/jupyter_server_config.d \
@@ -61,7 +65,8 @@ COPY .deploy/foundry-cpu/foundry_proxy.py \
 RUN chmod +x /opt/workshop/bin/*.sh \
     && mkdir -p /workspace \
     && printf '%s\n' "ROUTER_IMAGE=${ROUTER_IMAGE}" "DASHBOARD_IMAGE=${DASHBOARD_IMAGE}" \
-         "D3_LITE=vllm-sr/d3-lite@a8d25a91ef75552803f7009d25b7bd435991abd9" > /opt/workshop/versions.env
+         "D3_LITE=vllm-sr/d3-lite@a8d25a91ef75552803f7009d25b7bd435991abd9" \
+         "VELA3_FAST=vllm-sr/vela3-fast@7cbefd4b92b57234bd0ffb9872451e81abcdac79" > /opt/workshop/versions.env
 
 ENV PATH="/opt/workshop-venv/bin:${PATH}" \
     SHELL=/bin/bash \
@@ -82,7 +87,8 @@ ENV PATH="/opt/workshop-venv/bin:${PATH}" \
 LABEL org.opencontainers.image.title="vLLM-SR Route One Agent workshop (CPU, Azure Foundry, d3-lite)" \
       ai.vllm.semantic-router.router-image="${ROUTER_IMAGE}" \
       ai.vllm.semantic-router.dashboard-image="${DASHBOARD_IMAGE}" \
-      ai.vllm.semantic-router.decision-model="vllm-sr/d3-lite@a8d25a91ef75552803f7009d25b7bd435991abd9"
+      ai.vllm.semantic-router.decision-model="vllm-sr/d3-lite@a8d25a91ef75552803f7009d25b7bd435991abd9" \
+      ai.vllm.semantic-router.signal-model="vllm-sr/vela3-fast@7cbefd4b92b57234bd0ffb9872451e81abcdac79"
 
 WORKDIR /workspace
 ENTRYPOINT ["/usr/bin/tini", "--", "/opt/workshop/bin/start-workshop.sh"]
