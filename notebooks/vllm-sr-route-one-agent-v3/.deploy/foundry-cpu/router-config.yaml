@@ -67,6 +67,11 @@ global:
         device: cpu
         dtype: bfloat16
         public_name: d3-lite
+      vela3-fast:
+        provider: model_runtime
+        artifact: /opt/models/vela3-fast
+        device: cpu
+        public_name: vela3-fast
     system:
       decision_model: {deployment: d3-lite}
   services:
