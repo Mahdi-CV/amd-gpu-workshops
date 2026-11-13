@@ -30,6 +30,17 @@ recipes:
       complexity:
         - name: request_complexity
           description: Separate direct requests from reasoning-heavy work.
+      # Answered by vela3-fast. Used only by keep-vela3-fast-serving below, so the Router starts
+      # vela3-fast at boot next to d3-lite; it does not change any route.
+      jailbreak:
+        - name: keep_vela3_fast_serving
+          description: Keeps vela3-fast loaded; routing does not depend on it.
+          deployment: vela3-fast
+      keywords:
+        - name: vela3_keepalive_marker
+          operator: OR
+          keywords: [__vela3_keepalive_marker_never_sent__]
+          case_sensitive: true
     decisions:
       - name: reasoning-lane
         description: Use the stronger model for medium and hard work.
@@ -54,6 +65,22 @@ recipes:
         rules:
           operator: AND
           conditions: []
+        modelRefs:
+          - model: routine-model
+        algorithm:
+          type: static
+      # Never matches (it also needs a marker no prompt contains), but it ranks above routine-lane,
+      # so the Router keeps it, evaluates vela3-fast, and keeps vela3-fast serving next to d3-lite.
+      - name: keep-vela3-fast-serving
+        description: Keeps vela3-fast serving; never matches, so it never changes a route.
+        priority: 150
+        rules:
+          operator: AND
+          conditions:
+            - type: jailbreak
+              name: keep_vela3_fast_serving
+            - type: keyword
+              name: vela3_keepalive_marker
         modelRefs:
           - model: routine-model
         algorithm:
