@@ -3,15 +3,16 @@
 # Run with: bash ~/setup.sh   (FOUNDRY_ENDPOINT and FOUNDRY_API_KEY must be set)
 set -euo pipefail
 
-# The tested workshop image, pinned by digest (Router, Dashboard, d3-lite, relay, JupyterLab, Hermes).
-IMAGE='mahatri/vllm-sr-agent-workshop@sha256:95082234416c919b48f325201192cbaea7d9a4a51b289d3968de29e5b8f393c0'
+# The workshop image (Router, Dashboard, d3-lite + vela3-fast, relay, JupyterLab, Hermes).
+# Pulled only when it is not on this machine yet.
+IMAGE='mahatri/vllm-sr-agent-workshop:v5-foundry-cpu-d3'
 # Notebook files come from this branch (or a tag: REF=tags/<name>); if GitHub is unreachable,
 # the container uses the copy shipped in the image.
 OWNER='Mahdi-CV'; REPO='amd-gpu-workshops'
 REF="${REF:-heads/workshop/vllm-sr-route-one-agent-v3-foundry-cpu-d3}"
 SUB='notebooks/vllm-sr-route-one-agent-v3'
 DEST="$HOME/workshop"
-MIN_FREE_GB=10   # the image is 3.9 GB
+MIN_FREE_GB=20   # the image is 9.9 GB
 
 # Same Dashboard login on every VM; export either variable to override.
 DASH_EMAIL="${DASHBOARD_ADMIN_EMAIL:-admin@workshop.local}"
