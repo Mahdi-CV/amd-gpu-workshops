@@ -24,7 +24,7 @@ LAB_USER="${LAB_USER:-${SUDO_USER:-}}"
 LAB_HOME="$(getent passwd "$LAB_USER" | cut -d: -f6)"
 [ -d "$LAB_HOME" ] || { echo "no home directory for $LAB_USER"; exit 1; }
 
-# setup.sh (sha 1f80174d2b2e); written in place so its owner stays the lab user.
+# setup.sh (sha c96608b52a6f); written in place so its owner stays the lab user.
 cat > "$LAB_HOME/setup.sh" <<'VLLM_SR_SETUP_SH'
 #!/usr/bin/env bash
 # vLLM-SR workshop on a CPU-only lab VM: model lanes on Azure Foundry, d3-lite routing on the CPU.
@@ -82,30 +82,22 @@ else
   $DOCKER pull "$IMAGE"
 fi
 
-# 3. Notebook files: refreshed from GitHub on every run. The previous copy moves to
-#    ~/workshop/.previous/<time>/ so no edit is lost. If GitHub is unreachable, the current files
-#    stay (on a fresh VM the container then uses the copy in the image). The files are handled
-#    through the image because Jupyter saves them as root inside the container.
-mkdir -p "$DEST"
-TMP=$(mktemp -d)
-if curl -fsSL "https://codeload.github.com/$OWNER/$REPO/tar.gz/refs/$REF" | tar -xz -C "$TMP" 2>/dev/null \
-   && [ -f "$TMP"/*/"$SUB"/workshop_lab.py ]; then
-  SRC=$(echo "$TMP"/*/"$SUB")
-  STAMP=$(date +%Y%m%d-%H%M%S)
-  $DOCKER run --rm --entrypoint sh -e STAMP="$STAMP" -v "$DEST:/workspace" -v "$SRC:/src:ro" "$IMAGE" -c '
-    set -e
-    FILES="route-one-agent-across-two-models-v3.ipynb workshop_lab.py agent-demo"
-    if [ -f /workspace/workshop_lab.py ]; then
-      mkdir -p "/workspace/.previous/$STAMP"
-      for f in $FILES; do [ -e "/workspace/$f" ] && mv "/workspace/$f" "/workspace/.previous/$STAMP/"; done
-      echo "== previous workshop files moved to ~/workshop/.previous/$STAMP"
-    fi
-    for f in $FILES; do cp -r "/src/$f" /workspace/; done'
-  echo "== workshop files from GitHub ($REF)"
+# 3. Notebook files, once: a rerun keeps the student's edits.
+if [ -f "$DEST/workshop_lab.py" ]; then
+  echo "== workshop files already present, keeping them: $DEST"
 else
-  echo "== GitHub unreachable; keeping the current workshop files (a fresh VM uses the copy in the image)"
+  mkdir -p "$DEST"
+  TMP=$(mktemp -d)
+  if curl -fsSL "https://codeload.github.com/$OWNER/$REPO/tar.gz/refs/$REF" | tar -xz -C "$TMP" 2>/dev/null \
+     && [ -f "$TMP"/*/"$SUB"/workshop_lab.py ]; then
+    cp -r "$TMP"/*/"$SUB"/route-one-agent-across-two-models-v3.ipynb \
+          "$TMP"/*/"$SUB"/workshop_lab.py "$TMP"/*/"$SUB"/agent-demo "$DEST"/
+    echo "== workshop files from GitHub ($REF)"
+  else
+    echo "== GitHub unreachable; the container will use the copy in the image"
+  fi
+  rm -rf "$TMP"
 fi
-rm -rf "$TMP"
 
 # 4. The workshop container. Host networking: everything listens on this VM's 127.0.0.1 only
 #    (JupyterLab 8888, Dashboard 9000, routed API 8898, relay 8001/8002).
@@ -146,7 +138,7 @@ echo "Dashboard: http://localhost:9000"
 echo "Dashboard login: $DASH_EMAIL / $DASH_PASS"
 VLLM_SR_SETUP_SH
 chown "$LAB_USER": "$LAB_HOME/setup.sh"
-echo "setup.sh sha: $(sha256sum "$LAB_HOME/setup.sh" | cut -c1-12) (expected 1f80174d2b2e)"
+echo "setup.sh sha: $(sha256sum "$LAB_HOME/setup.sh" | cut -c1-12) (expected c96608b52a6f)"
 
 cat > /usr/local/bin/vllm-sr-lab-start <<'VLLM_SR_START'
 #!/usr/bin/env bash
