@@ -45,7 +45,7 @@ existing Route One folder or requiring a new image publication.
 From:
 
 ```text
-notebooks/vllm-sr-route-one-agent-v3/rules-to-reasoning-d3/
+notebooks/vllm-sr-route-one-agent-v3/agent-demo/rules-to-reasoning-d3/
 ```
 
 ```bash

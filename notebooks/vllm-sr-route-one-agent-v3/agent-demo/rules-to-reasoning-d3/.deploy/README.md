@@ -7,10 +7,14 @@ From Rules to Reasoning:
 Build an Intelligent Model Router with D3 Lite
 ```
 
-Participant notebook:
+Participant notebooks:
 
 ```text
 rules-to-reasoning-with-vllm-sr.ipynb
+  Production Microsoft/Azure Foundry environment
+
+rules-to-reasoning-with-vllm-sr-local-gpu.ipynb
+  Hosted AMD GPU environment with locally served task models
 ```
 
 The participant starts with exact keyword routing, sees why it cannot
@@ -45,6 +49,7 @@ Rebuild the notebook:
 
 ```bash
 uv run --with nbformat python .deploy/bin/build-notebook.py
+uv run --with nbformat python .deploy/bin/build-local-gpu-notebook.py
 ```
 
 Run acceptance inside the production image:

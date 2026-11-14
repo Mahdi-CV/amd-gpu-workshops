@@ -6,7 +6,7 @@
 # d3-lite by revision and per-file SHA-256.
 #
 # Build from the workshop folder:
-# notebooks/vllm-sr-route-one-agent-v3/rules-to-reasoning-d3
+# notebooks/vllm-sr-route-one-agent-v3/agent-demo/rules-to-reasoning-d3
 #   bash .deploy/foundry-cpu/fetch-d3-lite.sh
 #   docker build -f .deploy/foundry-cpu/Dockerfile -t <image> .
 
