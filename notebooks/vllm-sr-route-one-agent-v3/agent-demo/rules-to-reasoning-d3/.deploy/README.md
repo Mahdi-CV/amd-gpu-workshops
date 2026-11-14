@@ -10,7 +10,7 @@ Build an Intelligent Model Router with D3 Lite
 Participant notebooks:
 
 ```text
-rules-to-reasoning-with-vllm-sr.ipynb
+../../route-one-agent-across-two-models-v3.ipynb
   Production Microsoft/Azure Foundry environment
 
 rules-to-reasoning-with-vllm-sr-local-gpu.ipynb
@@ -51,6 +51,9 @@ Rebuild the notebook:
 uv run --with nbformat python .deploy/bin/build-notebook.py
 uv run --with nbformat python .deploy/bin/build-local-gpu-notebook.py
 ```
+
+The first command writes the production notebook to the established root
+deployment filename. The second writes the local-GPU variant in this folder.
 
 Run acceptance inside the production image:
 

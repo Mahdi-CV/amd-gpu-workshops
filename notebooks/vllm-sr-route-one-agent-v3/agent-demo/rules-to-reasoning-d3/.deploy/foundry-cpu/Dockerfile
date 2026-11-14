@@ -1,14 +1,15 @@
 # "From Rules to Reasoning" workshop: CPU-only lab VM, model lanes on Azure Foundry.
 #
-# One container: vLLM-SR Router (standalone gateway, d3-lite decision model on the CPU),
-# Dashboard, Foundry relay, JupyterLab (ihighlight, bash terminals) and Hermes.
+# One container: vLLM-SR Router (standalone gateway, d3-lite decision model
+# on the CPU), Dashboard, Foundry relay and JupyterLab.
 # Every input is pinned: images by digest, Python packages by version (requirements.lock),
 # d3-lite by revision and per-file SHA-256.
 #
-# Build from the workshop folder:
-# notebooks/vllm-sr-route-one-agent-v3/agent-demo/rules-to-reasoning-d3
-#   bash .deploy/foundry-cpu/fetch-d3-lite.sh
-#   docker build -f .deploy/foundry-cpu/Dockerfile -t <image> .
+# Build from notebooks/vllm-sr-route-one-agent-v3:
+#   bash agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/fetch-d3-lite.sh
+#   docker build \
+#     -f agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/Dockerfile \
+#     -t <image> .
 
 # vLLM-SR at commit 6b782822 (the CLI 0.5.0.dev20261110170302 runs exactly these images).
 ARG ROUTER_IMAGE=ghcr.io/vllm-project/semantic-router/vllm-sr@sha256:e241c2b513f5d19fab5047464fe9d9f58f5afa1d1c3193e127a0f27e021c8059
@@ -26,8 +27,8 @@ RUN apt-get update \
         curl git procps ripgrep tini \
     && rm -rf /var/lib/apt/lists/*
 
-# Workshop Python environment: JupyterLab, Hermes, the vllm-sr CLI the notebook validates with.
-COPY .deploy/foundry-cpu/requirements* /tmp/req/
+# Workshop Python environment: JupyterLab and the vllm-sr CLI.
+COPY agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/requirements* /tmp/req/
 RUN python3 -m venv /opt/workshop-venv \
     && /opt/workshop-venv/bin/pip install --no-cache-dir --upgrade "pip==26.3" \
     && if [ -f /tmp/req/requirements.lock ]; then \
@@ -44,7 +45,7 @@ COPY --from=dashboard /app/frontend /opt/vllm-sr-dashboard/frontend
 
 # Decision model, served from this local path; the workshop never contacts
 # Hugging Face at runtime.
-COPY .deploy/foundry-cpu/models/d3-lite /opt/models/d3-lite
+COPY agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/models/d3-lite /opt/models/d3-lite
 
 # JupyterLab terminals open a bash login shell instead of sh (dash).
 RUN mkdir -p /opt/workshop-venv/etc/jupyter/jupyter_server_config.d \
@@ -53,12 +54,12 @@ RUN mkdir -p /opt/workshop-venv/etc/jupyter/jupyter_server_config.d \
 
 # Workshop files: the notebook copy is the fallback when GitHub is unreachable
 # at launch. Participant API helpers are defined visibly inside the notebook.
-COPY rules-to-reasoning-with-vllm-sr.ipynb /opt/workshop/templates/
-COPY .deploy/foundry-cpu/router-config.yaml /opt/workshop/config/router.yaml
-COPY .deploy/foundry-cpu/foundry_proxy.py \
-     .deploy/foundry-cpu/start-platform.sh \
-     .deploy/foundry-cpu/start-workshop.sh \
-     .deploy/bin/verify-notebook-e2e.py \
+COPY route-one-agent-across-two-models-v3.ipynb workshop_lab.py /opt/workshop/templates/
+COPY agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/router-config.yaml /opt/workshop/config/router.yaml
+COPY agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/foundry_proxy.py \
+     agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/start-platform.sh \
+     agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/start-workshop.sh \
+     agent-demo/rules-to-reasoning-d3/.deploy/bin/verify-notebook-e2e.py \
      /opt/workshop/bin/
 RUN chmod +x /opt/workshop/bin/*.sh \
     && mkdir -p /workspace \

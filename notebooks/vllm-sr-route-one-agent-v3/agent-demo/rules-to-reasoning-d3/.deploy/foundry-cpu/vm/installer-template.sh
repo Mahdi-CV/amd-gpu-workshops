@@ -89,7 +89,7 @@ rc=$?
 echo "$(date -u +%FT%TZ) setup exited $rc"
 [ "$rc" = 0 ] || exit "$rc"
 
-printf 'The workshop is running.\n\nNotebook:    http://localhost:8888/lab/tree/rules-to-reasoning-with-vllm-sr.ipynb\nDashboard:   http://localhost:9000\nDashboard login: %s\n' "$LOGIN" > "$READY"
+printf 'The workshop is running.\n\nNotebook:    http://localhost:8888/lab/tree/route-one-agent-across-two-models-v3.ipynb\nDashboard:   http://localhost:9000\nDashboard login: %s\n' "$LOGIN" > "$READY"
 chown "$LAB_USER": "$READY" 2>/dev/null || true
 echo "$(date -u +%FT%TZ) ready: $READY"
 VLLM_SR_START
@@ -119,7 +119,7 @@ chmod 755 /usr/local/bin/vllm-sr-lab-scrub
 cat > /usr/local/bin/vllm-sr-lab-open <<'VLLM_SR_OPEN'
 #!/usr/bin/env bash
 # Opens the workshop notebook once ~/WORKSHOP-READY.txt appears (up to 20 minutes).
-URL="http://localhost:8888/lab/tree/rules-to-reasoning-with-vllm-sr.ipynb"
+URL="http://localhost:8888/lab/tree/route-one-agent-across-two-models-v3.ipynb"
 for _ in $(seq 1 240); do
   [ -f "$HOME/WORKSHOP-READY.txt" ] && break
   sleep 5

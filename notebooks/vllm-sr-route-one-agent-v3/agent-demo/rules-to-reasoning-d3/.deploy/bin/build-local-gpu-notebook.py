@@ -7,7 +7,8 @@ import nbformat
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "rules-to-reasoning-with-vllm-sr.ipynb"
+WORKSHOP_ROOT = ROOT.parents[1]
+SOURCE = WORKSHOP_ROOT / "route-one-agent-across-two-models-v3.ipynb"
 OUTPUT = ROOT / "rules-to-reasoning-with-vllm-sr-local-gpu.ipynb"
 
 

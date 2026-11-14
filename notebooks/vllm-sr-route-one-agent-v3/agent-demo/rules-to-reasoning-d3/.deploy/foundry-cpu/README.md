@@ -38,21 +38,21 @@ runtime base. It bind-mounts this workshop's:
 - acceptance test.
 
 This lets the new workshop ship from the Git branch without overwriting the
-existing Route One folder or requiring a new image publication.
+backup copy or requiring a new image publication.
 
 ## Optional dedicated image build
 
 From:
 
 ```text
-notebooks/vllm-sr-route-one-agent-v3/agent-demo/rules-to-reasoning-d3/
+notebooks/vllm-sr-route-one-agent-v3/
 ```
 
 ```bash
-bash .deploy/foundry-cpu/fetch-d3-lite.sh
+bash agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/fetch-d3-lite.sh
 
 docker build \
-  -f .deploy/foundry-cpu/Dockerfile \
+  -f agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/Dockerfile \
   -t mahatri/vllm-sr-rules-to-reasoning-d3:v1 \
   .
 ```

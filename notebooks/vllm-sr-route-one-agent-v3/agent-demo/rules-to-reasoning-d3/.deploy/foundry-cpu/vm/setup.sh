@@ -12,7 +12,7 @@ IMAGE="${IMAGE:-mahatri/vllm-sr-agent-workshop:v5-foundry-cpu-d3}"
 # the container uses the copy shipped in the image.
 OWNER='Mahdi-CV'; REPO='amd-gpu-workshops'
 REF="${REF:-heads/workshop/vllm-sr-route-one-agent-v3-foundry-cpu-d3}"
-SUB='notebooks/vllm-sr-route-one-agent-v3/agent-demo/rules-to-reasoning-d3'
+SUB='notebooks/vllm-sr-route-one-agent-v3'
 DEST="$HOME/rules-to-reasoning-workshop"
 MIN_FREE_GB=20   # the published base image is approximately 9.9 GB
 
@@ -64,23 +64,24 @@ fi
 mkdir -p "$DEST"
 TMP=$(mktemp -d)
 if curl -fsSL "https://codeload.github.com/$OWNER/$REPO/tar.gz/refs/$REF" | tar -xz -C "$TMP" 2>/dev/null \
-   && [ -f "$TMP"/*/"$SUB"/rules-to-reasoning-with-vllm-sr.ipynb ]; then
+   && [ -f "$TMP"/*/"$SUB"/route-one-agent-across-two-models-v3.ipynb ] \
+   && [ -f "$TMP"/*/"$SUB"/workshop_lab.py ]; then
   SRC=$(echo "$TMP"/*/"$SUB")
   STAMP=$(date +%Y%m%d-%H%M%S)
   $DOCKER run --rm --entrypoint sh -e STAMP="$STAMP" -v "$DEST:/workspace" -v "$SRC:/src:ro" "$IMAGE" -c '
     set -e
-    FILES="rules-to-reasoning-with-vllm-sr.ipynb"
-    if [ -f /workspace/rules-to-reasoning-with-vllm-sr.ipynb ]; then
+    FILES="route-one-agent-across-two-models-v3.ipynb workshop_lab.py"
+    if [ -f /workspace/route-one-agent-across-two-models-v3.ipynb ]; then
       mkdir -p "/workspace/.previous/$STAMP"
       for f in $FILES; do [ -e "/workspace/$f" ] && mv "/workspace/$f" "/workspace/.previous/$STAMP/"; done
       echo "== previous workshop file moved to ~/rules-to-reasoning-workshop/.previous/$STAMP"
     fi
     for f in $FILES; do cp -r "/src/$f" /workspace/; done
     mkdir -p /workspace/.runtime
-    cp /src/.deploy/foundry-cpu/start-platform.sh /workspace/.runtime/
-    cp /src/.deploy/foundry-cpu/start-workshop.sh /workspace/.runtime/
-    cp /src/.deploy/foundry-cpu/router-config.yaml /workspace/.runtime/
-    cp /src/.deploy/bin/verify-notebook-e2e.py /workspace/.runtime/'
+    cp /src/agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/start-platform.sh /workspace/.runtime/
+    cp /src/agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/start-workshop.sh /workspace/.runtime/
+    cp /src/agent-demo/rules-to-reasoning-d3/.deploy/foundry-cpu/router-config.yaml /workspace/.runtime/
+    cp /src/agent-demo/rules-to-reasoning-d3/.deploy/bin/verify-notebook-e2e.py /workspace/.runtime/'
   echo "== workshop files from GitHub ($REF)"
 else
   echo "== GitHub unreachable; keeping the current workshop files (a fresh VM uses the copy in the image)"
@@ -127,6 +128,6 @@ except Exception as e: print('FAILED:', e, getattr(e,'read',lambda:b'')()[:300])
 done
 
 echo
-echo "Open http://localhost:8888/lab/tree/rules-to-reasoning-with-vllm-sr.ipynb in the browser on this VM."
+echo "Open http://localhost:8888/lab/tree/route-one-agent-across-two-models-v3.ipynb in the browser on this VM."
 echo "Dashboard: http://localhost:9000"
 echo "Dashboard login: $DASH_EMAIL / $DASH_PASS"

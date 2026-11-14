@@ -7,7 +7,7 @@ mkdir -p /workspace/generated-config /workspace/logs /workspace/state
 # Notebook files: setup.sh normally downloads them from GitHub into /workspace;
 # when it could not, the copy shipped in this image is used. Existing student
 # edits are never touched.
-if [ ! -f /workspace/rules-to-reasoning-with-vllm-sr.ipynb ]; then
+if [ ! -f /workspace/route-one-agent-across-two-models-v3.ipynb ]; then
   echo "== /workspace has no workshop files; using the copy in the image"
   cp -rn /opt/workshop/templates/. /workspace/
 fi

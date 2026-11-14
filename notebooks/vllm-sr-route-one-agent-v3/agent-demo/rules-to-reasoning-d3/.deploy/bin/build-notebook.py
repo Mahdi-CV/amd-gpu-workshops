@@ -7,7 +7,8 @@ import nbformat as nbf
 
 
 ROOT = Path(__file__).resolve().parents[2]
-OUTPUT = ROOT / "rules-to-reasoning-with-vllm-sr.ipynb"
+WORKSHOP_ROOT = ROOT.parents[1]
+OUTPUT = WORKSHOP_ROOT / "route-one-agent-across-two-models-v3.ipynb"
 
 
 def md(source: str):
