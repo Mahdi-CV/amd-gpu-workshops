@@ -1,10 +1,9 @@
 """Deployment compatibility module for the Rules to Reasoning workshop.
 
-The participant notebook intentionally defines its three small HTTP helpers
+The participant notebook intentionally defines its two small HTTP helpers
 directly:
 
     preview_route(prompt)
-    send_prompt(prompt)
     apply_recipe(recipe)
 
 This file keeps the established workshop deployment contract intact without
@@ -25,6 +24,6 @@ def workshop_info() -> dict[str, str]:
         "name": WORKSHOP_NAME,
         "notebook": str(NOTEBOOK_PATH),
         "participant_api": (
-            "preview_route(prompt), send_prompt(prompt), apply_recipe(recipe)"
+            "preview_route(prompt), apply_recipe(recipe)"
         ),
     }

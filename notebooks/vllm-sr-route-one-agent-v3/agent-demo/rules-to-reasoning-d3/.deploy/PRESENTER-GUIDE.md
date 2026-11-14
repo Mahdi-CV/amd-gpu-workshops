@@ -57,8 +57,8 @@ For a 75-minute delivery:
 7. Say **routine-model** and **reasoning-model** for task models.
 8. Treat probabilities near the threshold as calibration evidence.
 9. Show the raw OpenAI-compatible request once.
-10. Use only the three participant operations:
-    `preview_route`, `send_prompt`, and `apply_recipe`.
+10. Use only the two participant operations:
+    `preview_route` and `apply_recipe`.
 11. State what participants are changing, why it matters, and what successful
     output looks like before each section.
 
@@ -203,13 +203,18 @@ routine-fallback, priority 100
 
 Compare a public analysis prompt with the same prompt marked `[PRIVATE]`.
 
-### Section 6: application integration
+### Section 6: deploy a recipe
 
-The application still requests:
+Show that the same recipe can be deployed either:
 
-```json
-{"model": "vllm-sr/auto"}
-```
+- as a Python dictionary through the management API; or
+- as YAML imported through Dashboard Builder.
+
+The default notebook path uses Python so automated execution remains
+repeatable. Demonstrate Dashboard import during delivery when time permits.
+
+Point out the PII example and its compatibility warning: raw D3 Lite does not
+support span extraction, so the example is not activated in the core lab.
 
 ### Launch Control
 

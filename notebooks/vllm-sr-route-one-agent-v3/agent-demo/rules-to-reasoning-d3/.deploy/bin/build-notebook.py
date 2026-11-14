@@ -299,6 +299,11 @@ Start with a requirement that needs no model judgment:
 
 > A request marked `[SECURITY-REVIEW]` must use the reasoning route.
 
+<div style="border:2px solid #7749bd;border-radius:12px;padding:15px 18px;margin:16px 0;background:#f8f4ff">
+  <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#583094">PROMPT</div>
+  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#24153b">[SECURITY-REVIEW] Review this token-rotation design and recommend two mitigations.</div>
+</div>
+
 The application already supplied the fact. Exact matching is the clearest
 policy:
 
@@ -316,7 +321,7 @@ otherwise
     ),
     md(
         r"""
-### Send one ordinary OpenAI-compatible request
+### Send the first prompt
 
 The Router is not a custom Python framework. It accepts the same request shape
 as an OpenAI-compatible model server.
@@ -358,16 +363,65 @@ The application requested `vllm-sr/auto`. The Router selected the logical
 task-model route, and the local relay forwarded the request to the matching
 Azure Foundry deployment.
 
-From here, three small functions remove repeated HTTP boilerplate:
+### The minimal working vLLM-SR flow
+
+This first request already contains the smallest useful Router:
+
+```text
+PROMPT
+→ SIGNAL observes a fact
+→ DECISION says what to do when that fact is true
+→ ROUTE selects the task model
+```
+
+<div style="border:2px solid #e34d59;border-radius:12px;padding:15px 18px;margin:16px 0;background:#fff6f6">
+  <div style="font-size:15px;font-weight:800;color:#8d2230">The two essential policy parts</div>
+  <div style="margin-top:8px"><b>Signal:</b> observes a fact about the request.</div>
+  <div style="margin-top:5px"><b>Decision:</b> turns that fact into an eligible route.</div>
+</div>
+
+| Term | Meaning in the first request |
+| --- | --- |
+| Prompt | The user text sent to `vllm-sr/auto` |
+| Signal | Did the exact `[SECURITY-REVIEW]` marker appear? |
+| Decision | If it appeared, make `security-review` eligible |
+| Priority | `security-review` outranks the routine fallback |
+| Route | Use the Reasoning route |
+| Task model | `reasoning-model` produces the answer |
+
+Signals are not limited to keywords. A Router can use one signal or combine
+several, depending on the application:
+
+| Signal family | Example observation |
+| --- | --- |
+| `keyword` | Does an exact application marker appear? |
+| `systemone` | Does the request require comparison or diagnosis? |
+| `complexity` | Is the request easy, medium, or hard? |
+| `context` | Is the request too large for a model? |
+| `metadata` | Did the application label the workload? |
+| `pii` | Where does personal information appear? |
+| `jailbreak` | Does the prompt look like an attack? |
+| `input_modality` | Does the request contain an image or audio? |
+| `conversation` | Is this a multi-turn or tool-heavy request? |
+
+Signals can be combined with `AND`, `OR`, and `NOT`. Decisions use priority
+when several rules match.
+
+> **Model compatibility matters:** PII commonly needs span extraction. Raw
+> D3 Lite supports `noul`, `choice`, and `score`, but not span extraction. A
+> span-capable signal model is required before activating a PII recipe.
+
+### Define helper functions
+
+To reduce repeated HTTP code, the next cell defines two small convenience
+functions. They are workshop wrappers—not additional vLLM-SR concepts:
 
 ```python
 preview_route(prompt)   # route without generating an answer
-send_prompt(prompt)     # route and generate an answer
 apply_recipe(recipe)    # validate and hot-reload routing policy
 ```
 
-Their implementations are visible in the next cell. They call the real Router
-APIs directly.
+Both call the real Router management APIs directly.
 """
     ),
     code(
@@ -429,8 +483,10 @@ def _preview_route(prompt):
 def preview_route(prompt):
     # Evaluate routing policy without asking a task model to generate.
     result = _preview_route(prompt)
-    print("Prompt:")
+    print("=" * 72)
+    print("PROMPT")
     print(" ", prompt)
+    print("-" * 72)
     print("Signal evidence:")
     if result["signal_values"]:
         for name, value in result["signal_values"].items():
@@ -452,47 +508,7 @@ def preview_route(prompt):
         )
     print("Route:", result["route"])
     print("Task model:", result["task_model"])
-    return result
-
-
-def send_prompt(prompt):
-    # Route one prompt and print the selected route and generated answer.
-    response = requests.post(
-        f"{ROUTER_API}/v1/chat/completions",
-        headers={
-            "content-type": "application/json",
-            "x-vsr-debug": "true",
-        },
-        json={
-            "model": ROUTED_MODEL,
-            "messages": [{"role": "user", "content": prompt}],
-            "max_tokens": 300,
-        },
-        timeout=650,
-    )
-    response.raise_for_status()
-    body = response.json()
-    message = body.get("choices", [{}])[0].get("message", {})
-    answer = message.get("content") or ""
-    if "</think>" in answer:
-        answer = answer.rsplit("</think>", 1)[1].lstrip()
-    if not answer.strip():
-        answer = (
-            "[The selected task model completed generation, but no final "
-            "answer text fit in the response limit.]"
-        )
-    model = response.headers.get("x-vsr-selected-model")
-    result = {
-        "decision": response.headers.get("x-vsr-selected-decision"),
-        "route": _selected_route(model),
-        "task_model": model,
-        "answer": answer.strip(),
-    }
-    print("Decision:", result["decision"])
-    print("Route:", result["route"])
-    print("Task model:", result["task_model"])
-    print("Answer:")
-    print(result["answer"])
+    print("=" * 72)
     return result
 
 
@@ -586,11 +602,61 @@ def apply_recipe(recipe):
     ),
     md(
         r"""
-### Activate the exact rule
+### vLLM-SR recipe
 
-The recipe contains only the policy that changes: signals and decisions.
-Listeners, providers, task-model endpoints, and Dashboard configuration remain
-active.
+A **recipe** groups the signals and decisions for one application entrypoint.
+Infrastructure such as listeners, task-model connections, and Dashboard
+settings remains outside the recipe.
+
+The first recipe reads as a sentence:
+
+```text
+IF the security-review-marker signal matches
+THEN the security-review decision enables reasoning-model
+OTHERWISE routine-fallback enables routine-model
+```
+
+```yaml
+signals:
+  keywords:
+    - name: security-review-marker
+      keywords: ["[SECURITY-REVIEW]"]
+
+decisions:
+  - name: security-review
+    priority: 200
+    rules:
+      operator: AND
+      conditions:
+        - type: keyword
+          name: security-review-marker
+    modelRefs:
+      - model: reasoning-model
+    algorithm:
+      type: static
+
+  - name: routine-fallback
+    priority: 100
+    rules:
+      operator: AND
+      conditions: []
+    modelRefs:
+      - model: routine-model
+    algorithm:
+      type: static
+```
+
+| Recipe field | Purpose |
+| --- | --- |
+| `signals` | Facts the Router can observe |
+| `decisions` | Routes made eligible by those facts |
+| `priority` | Resolves overlapping eligible decisions |
+| `modelRefs` | Task models available to a decision |
+| `algorithm` | Chooses among the decision's eligible models |
+
+The next cell creates and activates that recipe.
+
+Only signals and decisions change; the Foundry model connections remain active.
 """
     ),
     code(
@@ -646,11 +712,11 @@ apply_recipe(keyword_recipe)
         r"""
 Before running the next cell, predict each route:
 
-| Prompt | Prediction |
+| **Prompt** | Prediction |
 | --- | --- |
-| `[SECURITY-REVIEW]` review a token-rotation design | Reasoning route |
-| Define a security review in one sentence | Routine route |
-| Rewrite a launch update clearly | Routine route |
+| **`[SECURITY-REVIEW]` Review this token-rotation design and recommend two mitigations.** | Reasoning route |
+| **Define a security review in one sentence.** | Routine route |
+| **Rewrite this clearly: the launch paused while the team checks elevated retries.** | Routine route |
 """
     ),
     code(
@@ -730,24 +796,19 @@ print(yaml.safe_dump(active_recipe, sort_keys=False))
     ),
     md(
         r"""
-### Routing vocabulary
+### Signal and decision checkpoint
 
-| Concept | Question it answers |
-| --- | --- |
-| Entrypoint | Which public model name did the application request? |
-| Signal | What fact did the Router observe? |
-| Decision | If that fact is true, which route is eligible? |
-| Priority | Which eligible decision wins? |
-| Task model | Which model produces the answer? |
-| Evidence | Why did this route win? |
-
-The important distinction is:
+At this point you should be able to say:
 
 ```text
-decision       = application policy
-decision model = model that supplies routing evidence
+signal         = observed fact
+decision       = application policy using that fact
+decision model = model that can supply semantic evidence
 task model     = model that answers the user
 ```
+
+Every later section changes the signal or combines decisions. The basic flow
+does not change.
 """
     ),
     md(
@@ -756,10 +817,10 @@ task model     = model that answers the user
 
 Now remove the marker while keeping the request reasoning-heavy:
 
-```text
-Review this token-rotation design, identify attack paths,
-compare mitigations, and recommend a rollout.
-```
+<div style="border:2px solid #7749bd;border-radius:12px;padding:15px 18px;margin:16px 0;background:#f8f4ff">
+  <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#583094">PROMPT</div>
+  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#24153b">Review this token-rotation design, identify attack paths, compare mitigations, and recommend a rollout.</div>
+</div>
 
 Predict the result before running the cell.
 """
@@ -792,8 +853,10 @@ answers the question.
 
 We need only a yes/no question, called `noul`:
 
-> Does answering this request well require multi-step reasoning, comparison of
-> alternatives, diagnosis, or a justified plan?
+<div style="border:2px solid #d39b21;border-radius:12px;padding:15px 18px;margin:16px 0;background:#fffaf0">
+  <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#76530c">SYSTEM ONE ROUTING QUESTION</div>
+  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#3f300d">Does answering this request well require multi-step reasoning, comparison of alternatives, diagnosis, or a justified plan?</div>
+</div>
 
 D3 Lite returns the probability of **yes**. Application policy decides what
 probability is high enough.
@@ -871,6 +934,11 @@ The text is unchanged. Only the observation method changed:
 before: exact marker
 after:  D3 Lite answers a question about meaning
 ```
+
+<div style="border:2px solid #7749bd;border-radius:12px;padding:15px 18px;margin:16px 0;background:#f8f4ff">
+  <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#583094">PROMPT</div>
+  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#24153b">Review this token-rotation design, identify attack paths, compare mitigations, and recommend a rollout.</div>
+</div>
 """
     ),
     code(
@@ -900,6 +968,15 @@ Routing happens before the task model generates an answer.
 
 Predict each route. The last two prompts are boundary cases rather than right
 or wrong answers.
+
+| Label | **Prompt** | Prediction |
+| --- | --- | --- |
+| Definition | **Define a software rollback in one sentence.** | Routine route |
+| Rewrite | **Rewrite this clearly: the launch paused while checks are running.** | Routine route |
+| Checkout diagnosis | **A checkout sometimes charges customers twice after a timeout. Diagnose likely causes, compare three fixes, and recommend a safe rollout.** | Reasoning route |
+| Deployment choice | **Compare canary, blue-green, and rolling deployment for a small team. Recommend one and explain the tradeoffs.** | Reasoning route |
+| Brief troubleshooting | **Our application became slower after deployment. What should I check first?** | Boundary |
+| Teaching example | **Explain a cache with one shopping-cart example and one tradeoff.** | Boundary |
 """
     ),
     code(
@@ -977,6 +1054,19 @@ application requirement needs clarification.
 
 Suppose the reasoning route should be used only when a request compares
 technical approaches and recommends one.
+
+<div style="border:2px solid #d39b21;border-radius:12px;padding:15px 18px;margin:16px 0;background:#fffaf0">
+  <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#76530c">CUSTOM SYSTEM ONE QUESTION</div>
+  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#3f300d">Does the user ask to compare competing technical approaches and recommend or justify one?</div>
+</div>
+
+Test it with:
+
+| **Prompt** | Expected route |
+| --- | --- |
+| **Compare canary and blue-green deployment for a small team and recommend one.** | Reasoning route |
+| **Define blue-green deployment in one sentence.** | Routine route |
+| **Why might a deployment fail after a database migration?** | Routine route |
 """
     ),
     code(
@@ -1028,8 +1118,10 @@ exact.
 
 Add:
 
-> A request marked `[PRIVATE]` must stay on the Routine route, even if it asks
-> for difficult analysis.
+<div style="border:2px solid #e34d59;border-radius:12px;padding:15px 18px;margin:16px 0;background:#fff6f6">
+  <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#8d2230">APPLICATION REQUIREMENT</div>
+  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#43151b">A request marked [PRIVATE] must stay on the Routine route, even if it asks for difficult analysis.</div>
+</div>
 
 The private request can match two decisions:
 
@@ -1070,27 +1162,125 @@ private_recipe["decisions"].insert(
         "algorithm": {"type": "static"},
     },
 )
-
-apply_recipe(private_recipe)
 """
     ),
     md(
         r"""
-Compare two reasoning-heavy requests. The semantic evidence may be similar,
-but the application constraint changes the winning route.
+### Save the recipe as YAML
+
+Dashboard Builder imports YAML. Save the same recipe used by the Python
+management-API path:
 """
     ),
     code(
         r"""
-public_analysis = (
-    "Compare three strategies for reducing a service outage, "
-    "explain their tradeoffs, and recommend a safe rollout."
-)
-private_analysis = "[PRIVATE] " + public_analysis
+generated_config_dir = Path("/workspace/generated-config")
+generated_config_dir.mkdir(parents=True, exist_ok=True)
 
-public_result = preview_route(public_analysis)
+private_recipe_path = generated_config_dir / "05-private-recipe.yaml"
+private_recipe_path.write_text(
+    yaml.safe_dump(
+        {
+            "recipes": [
+                {
+                    "name": "default",
+                    "strategy": "priority",
+                    **copy.deepcopy(private_recipe),
+                }
+            ]
+        },
+        sort_keys=False,
+    ),
+    encoding="utf-8",
+)
+
+print("Saved Dashboard-ready recipe:")
+print(private_recipe_path)
 print()
-private_result = preview_route(private_analysis)
+print(private_recipe_path.read_text(encoding="utf-8"))
+"""
+    ),
+    md(
+        r"""
+## Section 6 — Deploy a vLLM-SR recipe
+
+You can deploy the same recipe in either of two ways.
+
+### Option A — Python and the management API
+
+`apply_recipe(private_recipe)` validates the active configuration and sends a
+JSON request to `PUT /api/v1/config`.
+
+### Option B — YAML through Dashboard
+
+1. Open **Routing → Builder**.
+2. Select **Import**.
+3. Paste or upload `generated-config/05-private-recipe.yaml`.
+4. Select **Compile**.
+5. Confirm the three decisions and their priorities.
+6. Select **Deploy**.
+
+Choose the method below. The default keeps notebook execution automatic:
+
+```python
+DEPLOY_METHOD = "python"       # or "dashboard"
+```
+
+<div style="border:2px solid #7749bd;border-radius:12px;padding:15px 18px;margin:16px 0;background:#f8f4ff">
+  <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#583094">PUBLIC PROMPT</div>
+  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#24153b">Compare three strategies for reducing a service outage, explain their tradeoffs, and recommend a safe rollout.</div>
+</div>
+
+<div style="border:2px solid #e34d59;border-radius:12px;padding:15px 18px;margin:16px 0;background:#fff6f6">
+  <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#8d2230">PRIVATE PROMPT</div>
+  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#43151b">[PRIVATE] Compare three strategies for reducing a service outage, explain their tradeoffs, and recommend a safe rollout.</div>
+</div>
+"""
+    ),
+    code(
+        r"""
+DEPLOY_METHOD = "python"  # change to "dashboard" to deploy the YAML manually
+
+if DEPLOY_METHOD == "python":
+    apply_recipe(private_recipe)
+elif DEPLOY_METHOD == "dashboard":
+    print("Deploy this file in Dashboard, then rerun this cell:")
+    print(private_recipe_path)
+else:
+    raise ValueError("DEPLOY_METHOD must be 'python' or 'dashboard'")
+
+active = requests.get(f"{MANAGEMENT_API}/api/v1/config", timeout=30)
+active.raise_for_status()
+active_recipe = next(
+    item
+    for item in active.json().get("recipes", [])
+    if item.get("name") == "default"
+)
+active_decisions = {
+    item.get("name")
+    for item in active_recipe.get("decisions", [])
+}
+required_decisions = {
+    "private-local",
+    "semantic-reasoning",
+    "routine-fallback",
+}
+
+if not required_decisions.issubset(active_decisions):
+    print("The private recipe is not active yet.")
+    print("Deploy it in Dashboard, then rerun this cell.")
+    private_deployed = False
+else:
+    private_deployed = True
+    public_analysis = (
+        "Compare three strategies for reducing a service outage, "
+        "explain their tradeoffs, and recommend a safe rollout."
+    )
+    private_analysis = "[PRIVATE] " + public_analysis
+
+    public_result = preview_route(public_analysis)
+    print()
+    private_result = preview_route(private_analysis)
 """
     ),
     md(
@@ -1103,32 +1293,37 @@ private-local matched
 semantic-reasoning may also have matched
 priority 300 beat priority 200
 ```
-"""
-    ),
-    md(
-        r"""
-## Section 6 — Connect an application
 
-Application code remains unchanged while routing policy evolves:
-"""
-    ),
-    code(
-        r"""
-application_response = send_prompt(
-    "Compare canary and blue-green deployment for a small team, "
-    "then recommend one and explain why."
-)
-"""
-    ),
-    md(
-        r"""
-The application still requested:
+### Signal example — PII
 
-```text
-vllm-sr/auto
+PII is another signal family. A policy might contain:
+
+```yaml
+signals:
+  pii:
+    - name: personal-data
+      pii_types_allowed: []
+
+decisions:
+  - name: keep-pii-local
+    priority: 300
+    rules:
+      operator: AND
+      conditions:
+        - type: pii
+          name: personal-data
+    modelRefs:
+      - model: routine-model
+    algorithm:
+      type: static
 ```
 
-It did not import routing logic or physical task-model names.
+<div style="border:2px solid #d39b21;border-radius:12px;padding:15px 18px;margin:16px 0;background:#fffaf0">
+  <b>Compatibility note:</b> PII detection commonly locates text spans. Raw
+  D3 Lite does not support span questions, so this workshop does not activate
+  the PII example. Use a span-capable signal deployment before adding it to a
+  live recipe.
+</div>
 """
     ),
     md(
@@ -1146,6 +1341,13 @@ Your policy must satisfy four requirements:
    use semantic reasoning.
 4. Everything else should use the Routine route.
 
+The hardest request matches all three specific policies:
+
+<div style="border:3px solid #e34d59;border-radius:12px;padding:16px 19px;margin:16px 0;background:#fff6f6">
+  <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#8d2230">THREE-WAY COLLISION PROMPT</div>
+  <div style="font-size:17px;font-weight:800;margin-top:6px;color:#43151b">[PRIVATE] [SECURITY-REVIEW] Investigate leaked credentials, compare containment strategies, and recommend a rollout.</div>
+</div>
+
 Choose priorities for:
 
 ```text
@@ -1153,6 +1355,13 @@ private-local
 security-review
 semantic-reasoning
 routine-fallback (already 100)
+```
+
+Then choose how to deploy:
+
+```text
+python     → apply the recipe through the management API
+dashboard  → import the generated YAML in Routing → Builder
 ```
 """
     ),
@@ -1162,11 +1371,13 @@ routine-fallback (already 100)
 PRIVATE_PRIORITY = None
 SECURITY_PRIORITY = None
 SEMANTIC_PRIORITY = None
+CHALLENGE_DEPLOY_METHOD = "python"  # or "dashboard"
 
 if None in (PRIVATE_PRIORITY, SECURITY_PRIORITY, SEMANTIC_PRIORITY):
     print("Choose all three priorities, then rerun this cell.")
     print("The routine fallback already has priority 100.")
     launch_recipe = None
+    launch_recipe_path = None
 else:
     launch_recipe = copy.deepcopy(semantic_recipe)
     launch_recipe["signals"]["keywords"] = [
@@ -1224,7 +1435,38 @@ else:
         },
         copy.deepcopy(semantic_recipe["decisions"][1]),
     ]
-    apply_recipe(launch_recipe)
+
+    launch_recipe_path = (
+        generated_config_dir / "launch-control-recipe.yaml"
+    )
+    launch_recipe_path.write_text(
+        yaml.safe_dump(
+            {
+                "recipes": [
+                    {
+                        "name": "default",
+                        "strategy": "priority",
+                        **copy.deepcopy(launch_recipe),
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    print("Saved Launch Control recipe:")
+    print(launch_recipe_path)
+
+    if CHALLENGE_DEPLOY_METHOD == "python":
+        apply_recipe(launch_recipe)
+    elif CHALLENGE_DEPLOY_METHOD == "dashboard":
+        print()
+        print("Import this YAML in Dashboard → Routing → Builder.")
+        print("Compile and Deploy it, then run the scorecard.")
+    else:
+        raise ValueError(
+            "CHALLENGE_DEPLOY_METHOD must be 'python' or 'dashboard'"
+        )
 """
     ),
     md(
@@ -1259,6 +1501,15 @@ You choose the numeric values.
 ### Launch Control test traffic
 
 The scorecard verifies both the decision and task model.
+
+| Case | **Prompt** | Required decision |
+| --- | --- | --- |
+| Launch update | **Rewrite this launch update clearly: rollout paused at 40 percent while the team checks elevated retry volume.** | `routine-fallback` |
+| Architecture | **Compare canary, blue-green, and rolling deployment. Recommend one and justify rollback criteria.** | `semantic-reasoning` |
+| Security review | **`[SECURITY-REVIEW]` Review the token-rotation design, identify attack paths, and recommend mitigations.** | `security-review` |
+| Private note | **`[PRIVATE]` Summarize an overdue-invoice note.** | `private-local` |
+| Private analysis | **`[PRIVATE]` Compare customer-recovery options and recommend a rollout.** | `private-local` |
+| Three-way collision | **`[PRIVATE] [SECURITY-REVIEW]` Investigate leaked credentials and recommend a rollout.** | `private-local` |
 """
     ),
     code(
@@ -1314,8 +1565,31 @@ launch_cases = {
     },
 }
 
+active = requests.get(f"{MANAGEMENT_API}/api/v1/config", timeout=30)
+active.raise_for_status()
+active_recipe = next(
+    item
+    for item in active.json().get("recipes", [])
+    if item.get("name") == "default"
+)
+active_decisions = {
+    item.get("name")
+    for item in active_recipe.get("decisions", [])
+}
+launch_decisions = {
+    "private-local",
+    "security-review",
+    "semantic-reasoning",
+    "routine-fallback",
+}
+
 if launch_recipe is None:
     print("Build and activate the Launch Control recipe first.")
+    launch_score = None
+elif not launch_decisions.issubset(active_decisions):
+    print("The Launch Control recipe is not active yet.")
+    print("Deploy the generated YAML in Dashboard, then rerun this cell:")
+    print(launch_recipe_path)
     launch_score = None
 else:
     passed = 0

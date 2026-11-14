@@ -24,7 +24,6 @@ Participant-facing operations are limited to:
 
 ```python
 preview_route(prompt)
-send_prompt(prompt)
 apply_recipe(recipe)
 ```
 

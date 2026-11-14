@@ -71,6 +71,15 @@ public reasoning-heavy -> semantic-reasoning -> reasoning-model
 [PRIVATE] same request -> private-local -> routine-model
 ```
 
+The notebook saves:
+
+```text
+/workspace/generated-config/05-private-recipe.yaml
+```
+
+Participants may deploy it through `apply_recipe(private_recipe)` or import it
+through Dashboard **Routing → Builder**.
+
 ## Launch Control
 
 One valid solution:
@@ -107,6 +116,15 @@ Completion:
 Score: 6/6
 Completion code: ROUTE-CONTROL-GREEN
 ```
+
+The challenge also saves:
+
+```text
+/workspace/generated-config/launch-control-recipe.yaml
+```
+
+Both the Python management-API path and Dashboard YAML path must activate the
+same four decisions.
 
 ## Recovery
 

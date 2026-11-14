@@ -48,7 +48,6 @@ Participants see one raw OpenAI-compatible request and then use only:
 
 ```python
 preview_route(prompt)
-send_prompt(prompt)
 apply_recipe(recipe)
 ```
 
