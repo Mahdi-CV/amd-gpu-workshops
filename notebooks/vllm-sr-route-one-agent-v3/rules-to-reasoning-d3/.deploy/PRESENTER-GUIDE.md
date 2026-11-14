@@ -66,6 +66,10 @@ For a 75-minute delivery:
 
 The production image must provide:
 
+- `FOUNDRY_ENDPOINT` and `FOUNDRY_API_KEY` from the Microsoft lab;
+- `FW-Qwen3.8-27B` as the routine Azure Foundry deployment;
+- `FW-GLM-5.3-Flash` as the reasoning Azure Foundry deployment;
+- local OpenAI-compatible relays on `8002` and `8001`;
 - the pinned CPU Router/runtime image;
 - pinned D3 Lite files under `/opt/models/d3-lite`;
 - D3 Lite listening on `127.0.0.1:8100`;
@@ -100,6 +104,12 @@ Frame the application:
 > route and a Reasoning route.
 
 Do not introduce System One or D3 Lite yet.
+
+State explicitly:
+
+> The two task models are already deployed on Azure Foundry. Participants do
+> not download or launch them. The VM exposes them through local relays so the
+> Router can use ordinary OpenAI-compatible provider connections.
 
 ### Section 1: exact keyword route
 
@@ -246,6 +256,18 @@ Inspect:
 - the threshold;
 - D3 Lite health; and
 - the active recipe returned by `GET /api/v1/config`.
+
+### A Foundry model connection is missing
+
+Do not ask participants to start a model server. Confirm:
+
+```bash
+test -n "$FOUNDRY_ENDPOINT"
+test -n "$FOUNDRY_API_KEY"
+curl -s http://127.0.0.1:8002/v1/models
+curl -s http://127.0.0.1:8001/v1/models
+tail -n 100 /workspace/logs/foundry-relay.log
+```
 
 ### Dashboard and notebook disagree
 

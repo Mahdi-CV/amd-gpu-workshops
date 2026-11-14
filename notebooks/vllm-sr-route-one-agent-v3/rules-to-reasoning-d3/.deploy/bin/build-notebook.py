@@ -32,10 +32,10 @@ cells = [
 You are building the routing policy for an engineering assistant used during
 software launches. It has two task-model routes:
 
-| Route | Task model | Best for |
-| --- | --- | --- |
-| **Routine route** | `routine-model` | Definitions, rewriting, formatting, and direct answers |
-| **Reasoning route** | `reasoning-model` | Diagnosis, comparison, architecture, and justified plans |
+| Route | Azure Foundry deployment | Logical Router name | Best for |
+| --- | --- | --- | --- |
+| **Routine route** | `FW-Qwen3.8-27B` | `routine-model` | Definitions, rewriting, formatting, and direct answers |
+| **Reasoning route** | `FW-GLM-5.3-Flash` | `reasoning-model` | Diagnosis, comparison, architecture, and justified plans |
 
 The application should not contain model-selection logic. It always requests:
 
@@ -99,17 +99,17 @@ By the end, you will be able to:
 
   <rect x="346" y="20" width="208" height="82" rx="16" fill="#fffaf0" stroke="#d39b21" stroke-width="2" filter="url(#shadow)"/>
   <text x="450" y="53" text-anchor="middle" font-size="20" font-weight="700" fill="#76530c">D3 Lite</text>
-  <text x="450" y="78" text-anchor="middle" font-size="14" fill="#695a35">answers routing questions</text>
+  <text x="450" y="78" text-anchor="middle" font-size="14" fill="#695a35">local CPU decision model</text>
 
   <rect x="688" y="72" width="220" height="118" rx="18" fill="#eff8ff" stroke="#2879bd" stroke-width="3" filter="url(#shadow)"/>
   <text x="798" y="108" text-anchor="middle" font-size="20" font-weight="800" fill="#155b91">Routine route</text>
   <text x="798" y="140" text-anchor="middle" font-size="17" font-weight="700" fill="#244b68">routine-model</text>
-  <text x="798" y="165" text-anchor="middle" font-size="14" fill="#4b6477">fast, direct work</text>
+  <text x="798" y="165" text-anchor="middle" font-size="14" fill="#4b6477">Azure Foundry deployment</text>
 
   <rect x="688" y="242" width="220" height="118" rx="18" fill="#f6f0ff" stroke="#7749bd" stroke-width="3" filter="url(#shadow)"/>
   <text x="798" y="278" text-anchor="middle" font-size="20" font-weight="800" fill="#583094">Reasoning route</text>
   <text x="798" y="310" text-anchor="middle" font-size="17" font-weight="700" fill="#493967">reasoning-model</text>
-  <text x="798" y="335" text-anchor="middle" font-size="14" fill="#66597b">analysis and tradeoffs</text>
+  <text x="798" y="335" text-anchor="middle" font-size="14" fill="#66597b">Azure Foundry deployment</text>
 
   <line x1="208" y1="215" x2="312" y2="215" stroke="#697386" stroke-width="3" marker-end="url(#arrow)"/>
   <line x1="450" y1="102" x2="450" y2="134" stroke="#d39b21" stroke-width="3" marker-end="url(#arrow)"/>
@@ -134,10 +134,32 @@ This workshop uses Decision 3.0 **`d3-lite`** as the decision model.
     ),
     md(
         r"""
-## 0. Check the workshop environment
+## 0. Connect to the models on Azure Foundry
+
+The two task models are already deployed on Azure Foundry:
+
+| Route | Azure Foundry model | Local OpenAI-compatible relay |
+| --- | --- | --- |
+| Routine route | `FW-Qwen3.8-27B` | `http://127.0.0.1:8002` |
+| Reasoning route | `FW-GLM-5.3-Flash` | `http://127.0.0.1:8001` |
+
+The lab VM receives `FOUNDRY_ENDPOINT` and `FOUNDRY_API_KEY` from the Microsoft
+lab environment. A small relay translates the local OpenAI-compatible requests
+into Foundry requests.
+
+```text
+Router → local relay → Azure Foundry deployment
+```
+
+You do **not** download, launch, or serve either task model in this workshop.
+
+D3 Lite is different: it is the small local CPU decision model used only for
+routing judgments. It does not write the user-facing answer.
+
+### Verify the preconfigured environment
 
 The Foundry relay, Router, D3 Lite, Dashboard, and JupyterLab start with the
-workshop container. Run the next cell to check them.
+workshop container. Run the next cell to verify their connections.
 """
     ),
     code(
@@ -158,6 +180,14 @@ MANAGEMENT_API = os.getenv("ROUTER_MANAGEMENT_API", "http://127.0.0.1:8080")
 DASHBOARD_URL = os.getenv("DASHBOARD_BROWSER_URL", "http://localhost:9000")
 ROUTINE_ENDPOINT = os.getenv("ROUTINE_ENDPOINT", "http://127.0.0.1:8002")
 REASONING_ENDPOINT = os.getenv("REASONING_ENDPOINT", "http://127.0.0.1:8001")
+ROUTINE_FOUNDRY_MODEL = os.getenv(
+    "ROUTINE_PROVIDER_MODEL",
+    "FW-Qwen3.8-27B",
+)
+REASONING_FOUNDRY_MODEL = os.getenv(
+    "REASONING_PROVIDER_MODEL",
+    "FW-GLM-5.3-Flash",
+)
 DECISION_MODEL_ENDPOINT = os.getenv(
     "DECISION_MODEL_ENDPOINT",
     "http://127.0.0.1:8100",
@@ -165,8 +195,8 @@ DECISION_MODEL_ENDPOINT = os.getenv(
 ROUTED_MODEL = "vllm-sr/auto"
 
 services = {
-    "Routine task model": f"{ROUTINE_ENDPOINT}/v1/models",
-    "Reasoning task model": f"{REASONING_ENDPOINT}/v1/models",
+    "Routine Foundry connection": f"{ROUTINE_ENDPOINT}/v1/models",
+    "Reasoning Foundry connection": f"{REASONING_ENDPOINT}/v1/models",
     "D3 Lite decision model": f"{DECISION_MODEL_ENDPOINT}/health",
     "Semantic Router": f"{ROUTER_API}/v1/models",
     "Router management API": f"{MANAGEMENT_API}/health",
@@ -184,6 +214,25 @@ for name, url in services.items():
         service_status[name] = False
         print(f"✗ {name}: {type(exc).__name__}")
 
+print()
+print("Configured task-model connections:")
+for route, endpoint, expected_model in (
+    ("Routine route", ROUTINE_ENDPOINT, ROUTINE_FOUNDRY_MODEL),
+    ("Reasoning route", REASONING_ENDPOINT, REASONING_FOUNDRY_MODEL),
+):
+    try:
+        response = requests.get(f"{endpoint}/v1/models", timeout=10)
+        response.raise_for_status()
+        discovered = [
+            item["id"]
+            for item in response.json().get("data", [])
+        ]
+        print(f"  {route}: {expected_model}")
+        print(f"    relay: {endpoint}")
+        print(f"    reported models: {discovered}")
+    except requests.RequestException as exc:
+        print(f"  {route}: unavailable ({type(exc).__name__})")
+
 display(
     HTML(
         f'<a href="{DASHBOARD_URL}" target="_blank" rel="noopener" '
@@ -200,7 +249,8 @@ print("Dashboard password:", os.getenv("DASHBOARD_ADMIN_PASSWORD", "workshop2026
         r"""
 ### Environment checkpoint
 
-Continue when every line begins with `✓`.
+Continue when all six service lines begin with `✓` and both Foundry relay
+connections report their expected model.
 
 The application-facing model is:
 
@@ -208,7 +258,9 @@ The application-facing model is:
 vllm-sr/auto
 ```
 
-### If a service is missing
+### If a connection is missing
+
+Do not start a task-model server. The task models remain on Azure Foundry.
 
 Open a Jupyter terminal and run:
 
@@ -231,7 +283,11 @@ tail -n 100 /workspace/logs/foundry-relay.log
 tail -n 100 /workspace/logs/dashboard.log
 ```
 
-Rerun the environment-check cell after the missing service becomes ready.
+If a Foundry relay is missing, confirm that the lab instructions supplied
+`FOUNDRY_ENDPOINT` and `FOUNDRY_API_KEY`, then rerun
+`/opt/workshop/bin/start-platform.sh`.
+
+Rerun the environment-check cell after the missing connection becomes ready.
 """
     ),
     md(
@@ -297,8 +353,9 @@ print("Answer:", body["choices"][0]["message"].get("content", "").strip())
     ),
     md(
         r"""
-The application requested `vllm-sr/auto`. The Router selected the physical
-task model.
+The application requested `vllm-sr/auto`. The Router selected the logical
+task-model route, and the local relay forwarded the request to the matching
+Azure Foundry deployment.
 
 From here, three small functions remove repeated HTTP boilerplate:
 

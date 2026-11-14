@@ -2,12 +2,29 @@
 
 This image runs:
 
-- two Azure Foundry task-model relays on `8002` and `8001`;
+- an Azure Foundry relay exposing `FW-Qwen3.8-27B` on `8002`;
+- an Azure Foundry relay exposing `FW-GLM-5.3-Flash` on `8001`;
 - Decision 3.0 D3 Lite on CPU port `8100`;
 - vLLM Semantic Router on `8898`;
 - the management API on `8080`;
 - Dashboard on `9000`; and
 - JupyterLab on `8888`.
+
+The task models are not served by the workshop container. The Microsoft lab
+injects:
+
+```text
+FOUNDRY_ENDPOINT
+FOUNDRY_API_KEY
+```
+
+Optional overrides:
+
+```text
+ROUTINE_DEPLOYMENT
+REASONING_DEPLOYMENT
+FOUNDRY_PATH
+```
 
 ## VM deployment
 

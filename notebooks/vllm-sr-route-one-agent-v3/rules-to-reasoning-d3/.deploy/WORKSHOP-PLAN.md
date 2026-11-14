@@ -59,12 +59,16 @@ There is no participant-facing `WorkshopLab` class.
 | Role | Name | Job |
 | --- | --- | --- |
 | Public entrypoint | `vllm-sr/auto` | Stable application model name |
-| Routine task model | `routine-model` | Direct and concise work |
-| Reasoning task model | `reasoning-model` | Diagnosis and tradeoffs |
+| Routine task model | `routine-model` → `FW-Qwen3.8-27B` | Direct and concise work |
+| Reasoning task model | `reasoning-model` → `FW-GLM-5.3-Flash` | Diagnosis and tradeoffs |
 | Decision model | `d3-lite` | Answer System One routing questions |
 
 The task models are Azure Foundry deployments behind local relays. D3 Lite is
 packaged into the CPU image and served locally on port `8100`.
+
+Participants never launch or download the task models. Microsoft lab
+credentials are injected as `FOUNDRY_ENDPOINT` and `FOUNDRY_API_KEY`; the
+relay presents both deployments as local OpenAI-compatible connections.
 
 ## Starter policy
 
