@@ -12,7 +12,7 @@ IMAGE="${IMAGE:-mahatri/vllm-sr-agent-workshop:v5-foundry-cpu-d3}"
 # the container uses the copy shipped in the image.
 OWNER='Mahdi-CV'; REPO='amd-gpu-workshops'
 REF="${REF:-heads/workshop/vllm-sr-route-one-agent-v3-foundry-cpu-d3}"
-SUB='notebooks/vllm-sr-rules-to-reasoning-d3'
+SUB='notebooks/vllm-sr-route-one-agent-v3/rules-to-reasoning-d3'
 DEST="$HOME/rules-to-reasoning-workshop"
 MIN_FREE_GB=20   # the published base image is approximately 9.9 GB
 

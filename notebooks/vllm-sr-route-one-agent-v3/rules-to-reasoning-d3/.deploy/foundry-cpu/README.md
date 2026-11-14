@@ -25,7 +25,11 @@ existing Route One folder or requiring a new image publication.
 
 ## Optional dedicated image build
 
-From `notebooks/vllm-sr-rules-to-reasoning-d3/`:
+From:
+
+```text
+notebooks/vllm-sr-route-one-agent-v3/rules-to-reasoning-d3/
+```
 
 ```bash
 bash .deploy/foundry-cpu/fetch-d3-lite.sh

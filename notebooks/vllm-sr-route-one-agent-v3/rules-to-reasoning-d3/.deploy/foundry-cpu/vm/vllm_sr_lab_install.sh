@@ -24,7 +24,7 @@ LAB_USER="${LAB_USER:-${SUDO_USER:-}}"
 LAB_HOME="$(getent passwd "$LAB_USER" | cut -d: -f6)"
 [ -d "$LAB_HOME" ] || { echo "no home directory for $LAB_USER"; exit 1; }
 
-# setup.sh (sha 55dcc13638f3); written in place so its owner stays the lab user.
+# setup.sh (sha a9319c6f23c7); written in place so its owner stays the lab user.
 cat > "$LAB_HOME/setup.sh" <<'VLLM_SR_SETUP_SH'
 #!/usr/bin/env bash
 # "From Rules to Reasoning" on a CPU-only lab VM: model lanes on Azure
@@ -40,7 +40,7 @@ IMAGE="${IMAGE:-mahatri/vllm-sr-agent-workshop:v5-foundry-cpu-d3}"
 # the container uses the copy shipped in the image.
 OWNER='Mahdi-CV'; REPO='amd-gpu-workshops'
 REF="${REF:-heads/workshop/vllm-sr-route-one-agent-v3-foundry-cpu-d3}"
-SUB='notebooks/vllm-sr-rules-to-reasoning-d3'
+SUB='notebooks/vllm-sr-route-one-agent-v3/rules-to-reasoning-d3'
 DEST="$HOME/rules-to-reasoning-workshop"
 MIN_FREE_GB=20   # the published base image is approximately 9.9 GB
 
@@ -160,7 +160,7 @@ echo "Dashboard: http://localhost:9000"
 echo "Dashboard login: $DASH_EMAIL / $DASH_PASS"
 VLLM_SR_SETUP_SH
 chown "$LAB_USER": "$LAB_HOME/setup.sh"
-echo "setup.sh sha: $(sha256sum "$LAB_HOME/setup.sh" | cut -c1-12) (expected 55dcc13638f3)"
+echo "setup.sh sha: $(sha256sum "$LAB_HOME/setup.sh" | cut -c1-12) (expected a9319c6f23c7)"
 
 cat > /usr/local/bin/vllm-sr-lab-start <<'VLLM_SR_START'
 #!/usr/bin/env bash
