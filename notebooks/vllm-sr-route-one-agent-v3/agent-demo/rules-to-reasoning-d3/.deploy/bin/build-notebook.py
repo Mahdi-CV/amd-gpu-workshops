@@ -220,20 +220,32 @@ for name, url in services.items():
         service_status[name] = False
         print(f"✗ {name}: {type(exc).__name__}")
 
-# D3 Lite runs inside the Router, so ask the Router whether it is loaded.
+# The decision model runs inside the Router, so ask the Router whether the
+# configured one is loaded.
+decision_deployment = "d3-lite"
 try:
+    decision_deployment = (
+        requests.get(f"{MANAGEMENT_API}/api/v1/config", timeout=10)
+        .json()
+        .get("global", {})
+        .get("model_catalog", {})
+        .get("system", {})
+        .get("decision_model", {})
+        .get("deployment")
+        or decision_deployment
+    )
     deployments = requests.get(
         f"{MANAGEMENT_API}/api/v1/diagnostics/models/systemone",
         timeout=10,
     ).json().get("deployments", [])
-    d3_ready = any(
-        item.get("id") == "d3-lite" and item.get("ready")
+    decision_ready = any(
+        item.get("id") == decision_deployment and item.get("ready")
         for item in deployments
     )
 except requests.RequestException:
-    d3_ready = False
-service_status["D3 Lite decision model"] = d3_ready
-print(f"{'✓' if d3_ready else '✗'} D3 Lite decision model")
+    decision_ready = False
+service_status["Decision model"] = decision_ready
+print(f"{'✓' if decision_ready else '✗'} Decision model ({decision_deployment})")
 
 print()
 print("Configured task-model connections:")
