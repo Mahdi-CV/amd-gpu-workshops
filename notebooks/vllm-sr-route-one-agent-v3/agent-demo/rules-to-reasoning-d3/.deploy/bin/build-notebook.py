@@ -333,8 +333,8 @@ otherwise
         r"""
 ### Send the first prompt
 
-The Router is not a custom Python framework. It accepts the same request shape
-as an OpenAI-compatible model server.
+The starter recipe is now active. Send the prompt through the same
+OpenAI-compatible request shape an application would use.
 """
     ),
     code(
@@ -2001,6 +2001,46 @@ The same configuration can be deployed through Docker or Kubernetes after
 replacing the workshop task-model endpoints.
 """
     ),
+]
+
+
+def one_cell_containing(marker: str):
+    matches = [cell for cell in cells if marker in cell.source]
+    if len(matches) != 1:
+        raise RuntimeError(f"{marker!r}: expected one cell, found {len(matches)}")
+    return matches[0]
+
+
+# Section 1 must activate its visible participant-authored recipe before the
+# first routed request. Keep the terminology walkthrough immediately after the
+# successful request, while moving only the helper introduction ahead of the
+# recipe that needs it.
+section_one = one_cell_containing("## Section 1 — Route an explicit request")
+send_intro = one_cell_containing("### Send the first prompt")
+send_request = one_cell_containing('f"{ROUTER_API}/v1/chat/completions"')
+flow_and_helpers = one_cell_containing("### The minimal working vLLM-SR flow")
+helper_code = one_cell_containing("def _selected_route(model):")
+recipe_intro = one_cell_containing("### vLLM-SR recipe")
+recipe_code = one_cell_containing("keyword_recipe = {")
+
+flow_source, helper_source = flow_and_helpers.source.split(
+    "### Define helper functions",
+    1,
+)
+flow_walkthrough = md(flow_source)
+helper_intro = md("### Define helper functions" + helper_source)
+
+section_start = cells.index(section_one)
+section_end = cells.index(recipe_code)
+cells[section_start : section_end + 1] = [
+    section_one,
+    helper_intro,
+    helper_code,
+    recipe_intro,
+    recipe_code,
+    send_intro,
+    send_request,
+    flow_walkthrough,
 ]
 
 

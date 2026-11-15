@@ -126,6 +126,15 @@ otherwise         -> routine-fallback -> Routine route
 The positive prompt must use the Reasoning route. A definition containing the
 words “security review” without the exact marker must stay routine.
 
+Keep the notebook order: define the two HTTP helpers, walk through the recipe,
+run `apply_recipe(keyword_recipe)`, and only then send the first raw
+OpenAI-compatible request. The first request must print:
+
+```text
+Decision: security-review
+Task model: reasoning-model
+```
+
 ### Section 2: follow one request
 
 Trace:
