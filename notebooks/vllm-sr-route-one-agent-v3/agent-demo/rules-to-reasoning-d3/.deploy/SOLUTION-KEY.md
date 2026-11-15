@@ -7,14 +7,32 @@ whenever the model revision, question wording, or rendering changes.
 
 ## Exact keyword recipe
 
-Expected:
+Run the participant flow in this order:
 
 ```text
-[SECURITY-REVIEW] ... -> security-review -> reasoning-model
-Define a security review. -> routine-fallback -> routine-model
+define preview_route and apply_recipe
+-> apply_recipe(keyword_recipe)
+-> preview the tagged prompt exactly once
+-> reuse tagged_result in Section 2
 ```
 
-The brackets are part of the marker.
+Expected first preview:
+
+```text
+Decision: security-review
+Route: Reasoning route
+Task model: reasoning-model
+```
+
+Expected controls:
+
+```text
+Define a security review. -> routine-fallback -> routine-model
+Rewrite the launch update.  -> routine-fallback -> routine-model
+```
+
+The brackets are part of the marker. The core exercise does not generate a
+task-model answer and does not rerun the tagged prompt.
 
 ## Broad D3 Lite question
 
@@ -30,7 +48,8 @@ Expected on the pinned CPU runtime:
 
 | Prompt | Approx. P(yes) | Model |
 | --- | ---: | --- |
-| Untagged security analysis | 0.86 | reasoning |
+| Untagged security analysis | 0.88 | reasoning |
+| Signing-key definition | 0.03 | routine |
 | Rollback definition | 0.04 | routine |
 | Launch rewrite | 0.07 | routine |
 | Duplicate-checkout diagnosis | 0.92 | reasoning |
