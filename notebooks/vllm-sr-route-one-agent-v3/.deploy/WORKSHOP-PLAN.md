@@ -597,54 +597,62 @@ Workshop 2 starts from this point:
 
 End with participants working, not listening.
 
-The guided incident rule showed the mechanics. The challenge gives everyone
-the same application requirement and an objective scorecard:
+Participants start from the working private recipe. Evaluation has found two
+gaps:
 
 ```text
-Public, reasoning-heavy financial requests may use the larger model.
-Private financial requests must remain on the smaller local model.
+Diagnosis-only work is over-routed to the reasoning model.
+An exact [INCIDENT] request is under-routed to the routine model.
 ```
 
-The two workshop models simulate different deployment boundaries:
+The new contract is:
 
-| Model | Simulated application role |
-| --- | --- |
-| `routine-model` | Smaller model inside the local data boundary |
-| `reasoning-model` | Larger model treated as an external service |
+```text
+compare alternatives + recommend or justify -> reasoning-model
+diagnosis without comparison                -> routine-model
+exact [INCIDENT]                             -> reasoning-model
+exact [PRIVATE]                              -> routine-model
+```
 
 Participants receive only these implementation hints:
 
 ```text
-Signals:   Dashboard → Build → Routing → Signals
-Decisions: Dashboard → Build → Routing → Decisions
+Start from private_recipe.
+Tune existing semantic evidence.
+Add exact application evidence where needed.
+A signal alone does not change routing.
+Private behavior must remain intact.
 ```
 
-They must add a signal, then either update an existing decision or create a new
-one. The four scorecard prompts provide the clues needed to choose the signal
-details and rule structure.
+They may tune an existing question or predicate, update a decision, add a
+signal, add a decision, or choose another valid rule tree. The six prompts
+provide the clues. The scorecard checks model behavior rather than one required
+implementation.
 
 The notebook checks only the selected model:
 
 | Request | Required model |
 | --- | --- |
-| Public simple | `routine-model` |
-| Public hard | `reasoning-model` |
-| Private simple | `routine-model` |
-| Private hard | `routine-model` |
+| Routine rewrite | `routine-model` |
+| Compare and recommend | `reasoning-model` |
+| Diagnosis only | `routine-model` |
+| Explicit incident | `reasoning-model` |
+| “incident” near miss | `routine-model` |
+| Private incident collision | `routine-model` |
 
 The route is complete only when the scorecard prints:
 
 ```text
-Challenge complete: 4/4 routing checks passed
+Challenge complete: 6/6 routing checks passed
 ```
 
-Presenters keep two supported policy designs in `.deploy/SOLUTION-KEY.md`.
-Do not expose the signal keywords or rule tree before participants attempt the
-challenge.
+The presenter solution key documents four tested policy designs. Do not expose
+the incident marker, tuned question, threshold, or rule tree before
+participants attempt the challenge.
 
 ---
 
-# Ninety-minute schedule
+# Ninety-five-minute schedule
 
 | Time | Section |
 | ---: | --- |
@@ -656,7 +664,7 @@ challenge.
 | 18 min | Rebuild the route incrementally |
 | 9 min | Guided application-specific customization |
 | 5 min | Select-mode MoM and Workshop 2 preview |
-| 10 min | Private-finance routing challenge |
+| 15 min | Existing-recipe tuning challenge |
 
 The challenge can continue as a take-home exercise if the group needs more
 time during model startup or agent execution.
