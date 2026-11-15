@@ -25,6 +25,10 @@ Participants will:
 8. pass Launch Control; and
 9. export a runnable Router starter.
 
+If time allows, participants also use Vela 3.0 to locate exact PII spans and
+bind that evidence to one policy decision without replacing the core D3 Lite
+path.
+
 ## Learning progression
 
 ```text
@@ -61,6 +65,7 @@ There is no participant-facing `WorkshopLab` class.
 | Routine task model | `routine-model` → `FW-Qwen3.8-27B` | Direct and concise work |
 | Reasoning task model | `reasoning-model` → `FW-GLM-5.3-Flash` | Diagnosis and tradeoffs |
 | Decision model | `d3-lite` | Answer System One routing questions |
+| Optional signal model | `vela3-fast` | Locate exact PII spans |
 
 The task models are Azure Foundry deployments behind local relays. D3 Lite is
 packaged into the CPU image and served locally on port `8100`.
@@ -105,3 +110,6 @@ Before release:
 9. Dashboard and management API show the same active configuration;
 10. the exported package uses `vllm-sr/d3-lite`; and
 11. the acceptance test restores the starter configuration.
+
+When the optional extension is included, also verify that Vela returns
+`PERSON`, `EMAIL_ADDRESS`, and `PHONE_NUMBER`, and that `pii-local` wins.

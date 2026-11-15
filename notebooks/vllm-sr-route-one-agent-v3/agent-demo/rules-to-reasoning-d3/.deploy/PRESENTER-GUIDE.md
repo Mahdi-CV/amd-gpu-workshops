@@ -26,6 +26,7 @@ They should distinguish:
 ## Recommended timing
 
 The beginner path, including Launch Control, is approximately 100 minutes.
+The optional Vela PII span extension adds about 10 minutes.
 
 | Segment | Minutes | Running total |
 | --- | ---: | ---: |
@@ -53,7 +54,8 @@ For a 75-minute delivery:
 3. Introduce terminology only after participants see a route.
 4. Read policy as a sentence before discussing YAML fields.
 5. Keep the same launch-assistant story throughout.
-6. Say **D3 Lite** only for the decision model.
+6. In the core path, say **D3 Lite** for the default decision model. In the
+   optional PII extension, call **Vela 3.0** the span-capable signal model.
 7. Say **routine-model** and **reasoning-model** for task models.
 8. Treat probabilities near the threshold as calibration evidence.
 9. Show the raw OpenAI-compatible request once.
@@ -72,6 +74,7 @@ The production image must provide:
 - local OpenAI-compatible relays on `8002` and `8001`;
 - the pinned CPU Router/runtime image;
 - pinned D3 Lite files under `/opt/models/d3-lite`;
+- pinned Vela 3.0 files under `/opt/models/vela3-fast`;
 - D3 Lite listening on `127.0.0.1:8100`;
 - the Foundry relay on `8001` and `8002`;
 - the Router listener on `8898`;
@@ -213,8 +216,21 @@ Show that the same recipe can be deployed either:
 The default notebook path uses Python so automated execution remains
 repeatable. Demonstrate Dashboard import during delivery when time permits.
 
-Point out the PII example and its compatibility warning: raw D3 Lite does not
-support span extraction, so the example is not activated in the core lab.
+Point out that raw D3 Lite does not support span extraction. If time allows,
+run the optional Vela extension:
+
+```text
+fictional PII prompt
+-> Vela span extraction
+-> personal-data signal
+-> pii-local, priority 400
+-> Routine route
+```
+
+The notebook discovers either `vela3-fast` or another ready Vela deployment
+name automatically. It saves `06-vela-pii-recipe.yaml`, which can also be
+imported through Dashboard Builder. Skip the extension if no ready
+span-capable Vela deployment appears.
 
 ### Launch Control
 
@@ -261,6 +277,17 @@ Inspect:
 - the threshold;
 - D3 Lite health; and
 - the active recipe returned by `GET /api/v1/config`.
+
+### The optional Vela PII extension skips
+
+Inspect the model capabilities:
+
+```bash
+curl -s http://127.0.0.1:8080/api/v1/diagnostics/models/systemone
+```
+
+The optional section needs a ready Vela deployment whose `question_types`
+contains `span`.
 
 ### A Foundry model connection is missing
 

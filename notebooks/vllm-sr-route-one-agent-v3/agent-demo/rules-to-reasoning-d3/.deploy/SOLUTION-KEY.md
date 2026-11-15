@@ -80,6 +80,41 @@ The notebook saves:
 Participants may deploy it through `apply_recipe(private_recipe)` or import it
 through Dashboard **Routing → Builder**.
 
+## Optional Vela PII span extension
+
+The fictional prompt should produce three spans:
+
+```text
+PERSON         Jane Doe
+EMAIL_ADDRESS  jane.doe@example.com
+PHONE_NUMBER   415-555-0134
+```
+
+The recipe adds:
+
+```text
+400 pii-local
+300 private-local
+200 semantic-reasoning
+100 routine-fallback
+```
+
+Expected:
+
+```text
+PII demo prompt                 -> pii-local -> routine-model
+Signing-key rotation definition -> routine-fallback -> routine-model
+```
+
+The notebook saves:
+
+```text
+/workspace/generated-config/06-vela-pii-recipe.yaml
+```
+
+This is optional because raw D3 Lite does not answer span questions. The
+exercise runs only when a ready Vela 3.0 deployment is available.
+
 ## Launch Control
 
 One valid solution:

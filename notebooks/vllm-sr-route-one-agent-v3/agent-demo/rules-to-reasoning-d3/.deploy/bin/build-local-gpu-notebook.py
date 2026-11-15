@@ -30,7 +30,9 @@ Router → local endpoint → AMD GPU task model
 ```
 
 D3 Lite runs separately on the CPU. It supplies routing evidence and does not
-write the user-facing answer.
+write the user-facing answer. The optional PII extension later discovers a
+span-capable Vela deployment automatically and skips cleanly if one is not
+available on this host.
 
 ### Verify the local environment
 
@@ -122,6 +124,18 @@ for cell in notebook.cells:
         "Azure Foundry deployment.",
         "The application requested `vllm-sr/auto`. The Router selected the logical\n"
         "task-model route and forwarded the request to the matching local GPU model.",
+    )
+    source = source.replace(
+        "Section 6 uses `vela3-fast` because Vela can locate exact text spans.",
+        "Section 6 uses `vela3-fast` when this host exposes a span-capable Vela deployment.",
+    )
+    source = source.replace(
+        "This environment also includes the\n"
+        "  span-capable <code>vela3-fast</code> model. The next cells discover its\n"
+        "  deployment name automatically, show the spans, and then use them in policy.",
+        "The next cells discover a span-capable\n"
+        "  Vela deployment automatically, show the spans, and then use them in policy.\n"
+        "  If this host does not expose Vela, the optional cells skip cleanly.",
     )
 
     if source.startswith("## 0. Connect to the models on Azure Foundry"):

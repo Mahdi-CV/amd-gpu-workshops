@@ -131,6 +131,14 @@ There are two different model jobs:
 | **Task model** | Produces the user-facing answer |
 
 This workshop uses Decision 3.0 **`d3-lite`** as the decision model.
+
+### Read the model cards
+
+- [Decision 3.0 D3 Lite on Hugging Face](https://huggingface.co/vllm-sr/d3-lite)
+- [Vela 3.0 `vela3-fast` on Hugging Face](https://huggingface.co/vllm-sr/vela3-fast)
+
+D3 Lite drives the core routing exercises. An optional extension after
+Section 6 uses `vela3-fast` because Vela can locate exact text spans.
 """
     ),
     md(
@@ -155,7 +163,9 @@ Router → local relay → Azure Foundry deployment
 You do **not** download, launch, or serve either task model in this workshop.
 
 D3 Lite is different: it is the small local CPU decision model used only for
-routing judgments. It does not write the user-facing answer.
+routing judgments. It does not write the user-facing answer. The image also
+contains `vela3-fast`; the core path does not need it, but the optional PII
+extension uses its span-extraction capability.
 
 ### Verify the preconfigured environment
 
@@ -301,7 +311,7 @@ Start with a requirement that needs no model judgment:
 
 <div style="border:2px solid #7749bd;border-radius:12px;padding:15px 18px;margin:16px 0;background:#f8f4ff">
   <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#583094">PROMPT</div>
-  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#24153b">[SECURITY-REVIEW] Review this token-rotation design and recommend two mitigations.</div>
+  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#24153b">[SECURITY-REVIEW] Our API rotates signing keys every 30 days. During rollout, services accept both the old and new key for 24 hours, and the old key is disabled manually. Review the design and recommend two mitigations.</div>
 </div>
 
 The application already supplied the fact. Exact matching is the clearest
@@ -341,8 +351,10 @@ response = requests.post(
             {
                 "role": "user",
                 "content": (
-                    "[SECURITY-REVIEW] Review this token-rotation design "
-                    "and recommend two mitigations."
+                    "[SECURITY-REVIEW] Our API rotates signing keys every 30 days. "
+                    "During rollout, services accept both the old and new key for "
+                    "24 hours, and the old key is disabled manually. Review the "
+                    "design and recommend two mitigations."
                 ),
             }
         ],
@@ -714,7 +726,7 @@ Before running the next cell, predict each route:
 
 | **Prompt** | Prediction |
 | --- | --- |
-| **`[SECURITY-REVIEW]` Review this token-rotation design and recommend two mitigations.** | Reasoning route |
+| **`[SECURITY-REVIEW]` Our API accepts both the old and new signing key for 24 hours during rotation. Review the design and recommend two mitigations.** | Reasoning route |
 | **Define a security review in one sentence.** | Routine route |
 | **Rewrite this clearly: the launch paused while the team checks elevated retries.** | Routine route |
 """
@@ -722,7 +734,10 @@ Before running the next cell, predict each route:
     code(
         r"""
 keyword_prompts = [
-    "[SECURITY-REVIEW] Review this token-rotation design and recommend two mitigations.",
+    (
+        "[SECURITY-REVIEW] Our API accepts both the old and new signing key "
+        "for 24 hours during rotation. Review the design and recommend two mitigations."
+    ),
     "Define a security review in one sentence.",
     "Rewrite this clearly: the launch paused while the team checks elevated retries.",
 ]
@@ -764,8 +779,8 @@ request text
     code(
         r"""
 tagged_security_request = (
-    "[SECURITY-REVIEW] Review this token-rotation design "
-    "and recommend two mitigations."
+    "[SECURITY-REVIEW] Our API accepts both the old and new signing key "
+    "for 24 hours during rotation. Review the design and recommend two mitigations."
 )
 
 tagged_result = preview_route(tagged_security_request)
@@ -819,7 +834,7 @@ Now remove the marker while keeping the request reasoning-heavy:
 
 <div style="border:2px solid #7749bd;border-radius:12px;padding:15px 18px;margin:16px 0;background:#f8f4ff">
   <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#583094">PROMPT</div>
-  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#24153b">Review this token-rotation design, identify attack paths, compare mitigations, and recommend a rollout.</div>
+  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#24153b">Our API rotates signing keys every 30 days. During rollout, services accept both the old and new key for 24 hours, and the old key is disabled manually. Identify attack paths, compare mitigations, and recommend a rollout.</div>
 </div>
 
 Predict the result before running the cell.
@@ -828,8 +843,9 @@ Predict the result before running the cell.
     code(
         r"""
 untagged_security_request = (
-    "Review this token-rotation design, identify attack paths, "
-    "compare mitigations, and recommend a rollout."
+    "Our API rotates signing keys every 30 days. During rollout, services "
+    "accept both the old and new key for 24 hours, and the old key is disabled "
+    "manually. Identify attack paths, compare mitigations, and recommend a rollout."
 )
 
 exact_policy_limit = preview_route(untagged_security_request)
@@ -937,7 +953,7 @@ after:  D3 Lite answers a question about meaning
 
 <div style="border:2px solid #7749bd;border-radius:12px;padding:15px 18px;margin:16px 0;background:#f8f4ff">
   <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#583094">PROMPT</div>
-  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#24153b">Review this token-rotation design, identify attack paths, compare mitigations, and recommend a rollout.</div>
+  <div style="font-size:17px;font-weight:700;margin-top:6px;color:#24153b">Our API rotates signing keys every 30 days. During rollout, services accept both the old and new key for 24 hours, and the old key is disabled manually. Identify attack paths, compare mitigations, and recommend a rollout.</div>
 </div>
 """
     ),
@@ -1296,17 +1312,21 @@ priority 300 beat priority 200
 
 ### Signal example — PII
 
-PII is another signal family. A policy might contain:
+PII is another signal family. Unlike our yes/no routing question, a useful
+PII detector should locate the exact text spans that caused the match.
 
 ```yaml
 signals:
   pii:
     - name: personal-data
-      pii_types_allowed: []
+      deployment: vela3-fast
+      predicate:
+        gte: 0.5
+      ignore_labels: []
 
 decisions:
-  - name: keep-pii-local
-    priority: 300
+  - name: pii-local
+    priority: 400
     rules:
       operator: AND
       conditions:
@@ -1318,12 +1338,187 @@ decisions:
       type: static
 ```
 
+`deployment` selects a model for this signal only. `ignore_labels: []` means
+that no detected PII category is ignored.
+
 <div style="border:2px solid #d39b21;border-radius:12px;padding:15px 18px;margin:16px 0;background:#fffaf0">
-  <b>Compatibility note:</b> PII detection commonly locates text spans. Raw
-  D3 Lite does not support span questions, so this workshop does not activate
-  the PII example. Use a span-capable signal deployment before adding it to a
-  live recipe.
+  <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#76530c">OPTIONAL — IF TIME ALLOWS</div>
+  <div style="margin-top:7px"><b>Use Vela 3.0 for exact PII spans.</b> D3 Lite
+  handles the core <code>noul</code> routing question, but raw D3 Lite does not
+  answer <code>span</code> questions. This environment also includes the
+  span-capable <code>vela3-fast</code> model. The next cells discover its
+  deployment name automatically, show the spans, and then use them in policy.</div>
 </div>
+
+Use only fictional data in the demonstration prompt.
+"""
+    ),
+    code(
+        r"""
+# Optional: ask the deployed Vela model for exact PII spans.
+PII_DEMO_PROMPT = (
+    "Demo record: update Jane Doe at jane.doe@example.com "
+    "and call 415-555-0134."
+)
+
+VELA_DEPLOYMENT = None
+VELA_PII_SPANS = []
+
+try:
+    capabilities_response = requests.get(
+        f"{MANAGEMENT_API}/api/v1/diagnostics/models/systemone",
+        timeout=30,
+    )
+    capabilities_response.raise_for_status()
+    deployments = capabilities_response.json().get("deployments", [])
+    vela = next(
+        (
+            item
+            for item in deployments
+            if item.get("ready")
+            and "span" in item.get("question_types", [])
+            and (
+                item.get("family") == "vela3"
+                or item.get("model") == "vela3-fast"
+                or "vela3-fast" in item.get("artifact", "")
+            )
+        ),
+        None,
+    )
+
+    if vela is None:
+        print("Optional Vela span extension is not enabled on this host; skip it.")
+    else:
+        span_response = requests.post(
+            f"{MANAGEMENT_API}/api/v1/diagnostics/models/systemone",
+            json={
+                "deployment": vela["id"],
+                "request": {
+                    "state": PII_DEMO_PROMPT,
+                    "questions": {
+                        "personal_data_spans": {
+                            "type": "span",
+                            "instructions": "Which spans are personal information?",
+                            "criteria": [
+                                "PERSON",
+                                "EMAIL_ADDRESS",
+                                "PHONE_NUMBER",
+                            ],
+                        }
+                    },
+                    "options": {"return_meta": True},
+                },
+            },
+            timeout=90,
+        )
+        span_response.raise_for_status()
+        span_body = span_response.json()
+        VELA_PII_SPANS = span_body.get("spans", {}).get(
+            "personal_data_spans",
+            [],
+        )
+        VELA_DEPLOYMENT = vela["id"]
+
+        print("Vela deployment:", VELA_DEPLOYMENT)
+        print("PROMPT")
+        print(" ", PII_DEMO_PROMPT)
+        print("Detected spans:")
+        for span in VELA_PII_SPANS:
+            print(
+                f"  {span['label']:14} {span['text']!r} "
+                f"characters {span['start']}:{span['end']} "
+                f"score={span['probability']:.3f}"
+            )
+except requests.RequestException as exc:
+    print("Optional Vela span extension is unavailable:", type(exc).__name__)
+"""
+    ),
+    md(
+        r"""
+The diagnostic call above asks the signal model directly and does **not**
+change routing policy. If spans appeared, wire the same Vela deployment into
+a real PII signal:
+
+```text
+PROMPT
+→ Vela locates PII spans
+→ personal-data signal matches
+→ pii-local decision wins by priority
+→ Routine route
+```
+"""
+    ),
+    code(
+        r"""
+# Optional: add Vela-backed PII evidence to the recipe from Section 6.
+if VELA_DEPLOYMENT is None:
+    print("Skip this cell because no ready Vela span deployment was discovered.")
+else:
+    pii_recipe = copy.deepcopy(private_recipe)
+    pii_recipe["signals"]["pii"] = [
+        {
+            "name": "personal-data",
+            "description": "Vela locates personal-data spans in the request.",
+            "deployment": VELA_DEPLOYMENT,
+            "predicate": {"gte": 0.5},
+            "ignore_labels": [],
+            "timeout_ms": 60000,
+        }
+    ]
+    pii_recipe["decisions"].insert(
+        0,
+        {
+            "name": "pii-local",
+            "description": "Requests containing personal data stay on the Routine route.",
+            "priority": 400,
+            "rules": {
+                "operator": "AND",
+                "conditions": [
+                    {"type": "pii", "name": "personal-data"}
+                ],
+            },
+            "modelRefs": [{"model": "routine-model"}],
+            "algorithm": {"type": "static"},
+        },
+    )
+
+    pii_recipe_path = generated_config_dir / "06-vela-pii-recipe.yaml"
+    pii_recipe_path.write_text(
+        yaml.safe_dump(
+            {
+                "recipes": [
+                    {
+                        "name": "default",
+                        "strategy": "priority",
+                        **copy.deepcopy(pii_recipe),
+                    }
+                ]
+            },
+            sort_keys=False,
+        ),
+        encoding="utf-8",
+    )
+    print("Saved optional Dashboard-ready recipe:")
+    print(pii_recipe_path)
+
+    apply_recipe(pii_recipe)
+    pii_route_result = preview_route(PII_DEMO_PROMPT)
+    print()
+    clean_route_result = preview_route(
+        "Explain signing-key rotation in one sentence."
+    )
+"""
+    ),
+    md(
+        r"""
+The PII prompt should select `pii-local`; the clean control should select
+`routine-fallback`. Both may use the same task-model route, but for different
+policy reasons.
+
+The explicit `deployment` changes only the PII signal. Signals without one
+continue using the configured default decision model. The final challenge
+below rebuilds its recipe, so running this optional extension does not change
+the challenge.
 """
     ),
     md(
@@ -1506,7 +1701,7 @@ The scorecard verifies both the decision and task model.
 | --- | --- | --- |
 | Launch update | **Rewrite this launch update clearly: rollout paused at 40 percent while the team checks elevated retry volume.** | `routine-fallback` |
 | Architecture | **Compare canary, blue-green, and rolling deployment. Recommend one and justify rollback criteria.** | `semantic-reasoning` |
-| Security review | **`[SECURITY-REVIEW]` Review the token-rotation design, identify attack paths, and recommend mitigations.** | `security-review` |
+| Security review | **`[SECURITY-REVIEW]` Our API accepts old and new signing keys for 24 hours during rotation. Identify attack paths and recommend mitigations.** | `security-review` |
 | Private note | **`[PRIVATE]` Summarize an overdue-invoice note.** | `private-local` |
 | Private analysis | **`[PRIVATE]` Compare customer-recovery options and recommend a rollout.** | `private-local` |
 | Three-way collision | **`[PRIVATE] [SECURITY-REVIEW]` Investigate leaked credentials and recommend a rollout.** | `private-local` |
@@ -1533,8 +1728,8 @@ launch_cases = {
     },
     "security_review": {
         "prompt": (
-            "[SECURITY-REVIEW] Review the token-rotation design, identify "
-            "attack paths, and recommend mitigations."
+            "[SECURITY-REVIEW] Our API accepts old and new signing keys for "
+            "24 hours during rotation. Identify attack paths and recommend mitigations."
         ),
         "decision": "security-review",
         "model": "reasoning-model",
