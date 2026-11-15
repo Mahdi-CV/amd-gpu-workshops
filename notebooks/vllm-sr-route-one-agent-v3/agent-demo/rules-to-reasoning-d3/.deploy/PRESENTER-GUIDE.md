@@ -58,7 +58,8 @@ For a 75-minute delivery:
    optional PII extension, call **Vela 3.0** the span-capable signal model.
 7. Say **routine-model** and **reasoning-model** for task models.
 8. Treat probabilities near the threshold as calibration evidence.
-9. Show the raw OpenAI-compatible request once.
+9. Keep the core path on routing previews; show the raw chat-completions call
+   only in the final application appendix.
 10. Use only the two participant operations:
     `preview_route` and `apply_recipe`.
 11. State what participants are changing, why it matters, and what successful
@@ -126,14 +127,18 @@ otherwise         -> routine-fallback -> Routine route
 The positive prompt must use the Reasoning route. A definition containing the
 words “security review” without the exact marker must stay routine.
 
-Keep the notebook order: define the two HTTP helpers, walk through the recipe,
-run `apply_recipe(keyword_recipe)`, and only then send the first raw
-OpenAI-compatible request. The first request must print:
+Keep the notebook order: define the two HTTP helpers, introduce the Section 1
+prompt, walk through the recipe, run `apply_recipe(keyword_recipe)`, and then
+preview that prompt exactly once. The preview must print:
 
 ```text
 Decision: security-review
+Route: Reasoning route
 Task model: reasoning-model
 ```
+
+Do not generate a task-model answer here and do not rerun the tagged prompt in
+the controls or Section 2. Reuse `tagged_result`.
 
 ### Section 2: follow one request
 

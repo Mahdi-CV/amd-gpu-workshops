@@ -15,7 +15,7 @@ One, Dashboard, or D3 experience is required.
 
 Participants will:
 
-1. call one OpenAI-compatible routed model;
+1. preview how an ordinary prompt will route;
 2. build and inspect an exact keyword route;
 3. explain signal, decision, priority, route, and task model;
 4. recognize the limitation of exact matching;
@@ -48,7 +48,7 @@ participants to rebuild listener, provider, Dashboard, or runtime boilerplate.
 
 ## Participant API surface
 
-Participants see one raw OpenAI-compatible request and then use only:
+Participants use only:
 
 ```python
 preview_route(prompt)
@@ -56,6 +56,9 @@ apply_recipe(recipe)
 ```
 
 There is no participant-facing `WorkshopLab` class.
+
+The final appendix shows the raw OpenAI-compatible chat request for application
+integration without interrupting the core routing lesson with generation.
 
 ## Runtime roles
 

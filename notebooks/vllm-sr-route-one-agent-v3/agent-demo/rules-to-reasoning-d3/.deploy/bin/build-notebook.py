@@ -65,7 +65,7 @@ EXACT MARKER
 
 By the end, you will be able to:
 
-1. send an ordinary OpenAI-compatible request through the Router;
+1. preview how an ordinary prompt will route through the Router;
 2. explain signal → decision → route → task model;
 3. create an exact application rule;
 4. ask D3 Lite a semantic routing question through System One;
@@ -331,53 +331,36 @@ otherwise
     ),
     md(
         r"""
-### Send the first prompt
+### Run the first prompt
 
-The starter recipe is now active. Send the prompt through the same
-OpenAI-compatible request shape an application would use.
+The starter recipe is now active. Use the workshop helper to inspect the route
+without generating a long task-model answer:
 """
     ),
     code(
         r"""
-response = requests.post(
-    f"{ROUTER_API}/v1/chat/completions",
-    headers={
-        "content-type": "application/json",
-        "x-vsr-debug": "true",
-    },
-    json={
-        "model": ROUTED_MODEL,
-        "messages": [
-            {
-                "role": "user",
-                "content": (
-                    "[SECURITY-REVIEW] Our API rotates signing keys every 30 days. "
-                    "During rollout, services accept both the old and new key for "
-                    "24 hours, and the old key is disabled manually. Review the "
-                    "design and recommend two mitigations."
-                ),
-            }
-        ],
-    },
-    timeout=180,
+tagged_security_request = (
+    "[SECURITY-REVIEW] Our API rotates signing keys every 30 days. "
+    "During rollout, services accept both the old and new key for "
+    "24 hours, and the old key is disabled manually. Review the "
+    "design and recommend two mitigations."
 )
-response.raise_for_status()
 
-body = response.json()
-print("Decision:", response.headers.get("x-vsr-selected-decision"))
-print("Task model:", response.headers.get("x-vsr-selected-model"))
-print("Answer:", body["choices"][0]["message"].get("content", "").strip())
+tagged_result = preview_route(tagged_security_request)
 """
     ),
     md(
         r"""
-The application requested `vllm-sr/auto`. The Router selected the logical
-task-model route, and the local relay forwarded the request to the matching
-Azure Foundry deployment.
+`preview_route` asks the Router which policy path would win without invoking a
+task model. That keeps this section focused on routing evidence rather than the
+quality or length of a generated answer.
+
+The application-facing model name remains `vllm-sr/auto`. A real application
+uses the standard chat-completions endpoint shown in the final appendix.
 
 ### The minimal working vLLM-SR flow
 
-This first request already contains the smallest useful Router:
+This first preview contains the smallest useful Router:
 
 ```text
 PROMPT
@@ -392,14 +375,14 @@ PROMPT
   <div style="margin-top:5px"><b>Decision:</b> turns that fact into an eligible route.</div>
 </div>
 
-| Term | Meaning in the first request |
+| Term | Meaning in the first preview |
 | --- | --- |
 | Prompt | The user text sent to `vllm-sr/auto` |
 | Signal | Did the exact `[SECURITY-REVIEW]` marker appear? |
 | Decision | If it appeared, make `security-review` eligible |
 | Priority | `security-review` outranks the routine fallback |
 | Route | Use the Reasoning route |
-| Task model | `reasoning-model` produces the answer |
+| Task model | `reasoning-model` would produce the answer |
 
 Signals are not limited to keywords. A Router can use one signal or combine
 several, depending on the application:
@@ -722,27 +705,23 @@ apply_recipe(keyword_recipe)
     ),
     md(
         r"""
-Before running the next cell, predict each route:
+The tagged prompt already passed. Predict two controls without running that
+same prompt again:
 
 | **Prompt** | Prediction |
 | --- | --- |
-| **`[SECURITY-REVIEW]` Our API accepts both the old and new signing key for 24 hours during rotation. Review the design and recommend two mitigations.** | Reasoning route |
 | **Define a security review in one sentence.** | Routine route |
 | **Rewrite this clearly: the launch paused while the team checks elevated retries.** | Routine route |
 """
     ),
     code(
         r"""
-keyword_prompts = [
-    (
-        "[SECURITY-REVIEW] Our API accepts both the old and new signing key "
-        "for 24 hours during rotation. Review the design and recommend two mitigations."
-    ),
+keyword_control_prompts = [
     "Define a security review in one sentence.",
     "Rewrite this clearly: the launch paused while the team checks elevated retries.",
 ]
 
-for prompt in keyword_prompts:
+for prompt in keyword_control_prompts:
     preview_route(prompt)
     print()
 """
@@ -764,7 +743,8 @@ marker absent  → fallback
         r"""
 ## Section 2 — Follow one request through the Router
 
-Use the tagged request to name every step:
+Reuse `tagged_result` from Section 1—no second Router request is sent. Follow
+that captured result through every step:
 
 ```text
 request text
@@ -772,18 +752,8 @@ request text
 → keyword signal matches
 → security-review decision becomes eligible
 → priority 200 beats fallback 100
-→ reasoning-model generates
+→ reasoning-model is selected
 ```
-"""
-    ),
-    code(
-        r"""
-tagged_security_request = (
-    "[SECURITY-REVIEW] Our API accepts both the old and new signing key "
-    "for 24 hours during rotation. Review the design and recommend two mitigations."
-)
-
-tagged_result = preview_route(tagged_security_request)
 """
     ),
     md(
@@ -2011,13 +1981,15 @@ def one_cell_containing(marker: str):
     return matches[0]
 
 
-# Section 1 must activate its visible participant-authored recipe before the
-# first routed request. Keep the terminology walkthrough immediately after the
-# successful request, while moving only the helper introduction ahead of the
-# recipe that needs it.
+# Define the two reusable HTTP helpers once, then begin Section 1. The visible
+# participant-authored recipe must be active before the prompt is previewed.
+# Keep the terminology walkthrough immediately after that one successful
+# preview.
 section_one = one_cell_containing("## Section 1 — Route an explicit request")
-send_intro = one_cell_containing("### Send the first prompt")
-send_request = one_cell_containing('f"{ROUTER_API}/v1/chat/completions"')
+send_intro = one_cell_containing("### Run the first prompt")
+send_request = one_cell_containing(
+    "tagged_result = preview_route(tagged_security_request)"
+)
 flow_and_helpers = one_cell_containing("### The minimal working vLLM-SR flow")
 helper_code = one_cell_containing("def _selected_route(model):")
 recipe_intro = one_cell_containing("### vLLM-SR recipe")
@@ -2033,9 +2005,9 @@ helper_intro = md("### Define helper functions" + helper_source)
 section_start = cells.index(section_one)
 section_end = cells.index(recipe_code)
 cells[section_start : section_end + 1] = [
-    section_one,
     helper_intro,
     helper_code,
+    section_one,
     recipe_intro,
     recipe_code,
     send_intro,
