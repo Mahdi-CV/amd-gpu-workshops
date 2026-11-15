@@ -1936,7 +1936,7 @@ if launch_score and launch_score["passed"] == launch_score["total"]:
     (export_dir / "README.md").write_text(
         "# My Semantic Router\n\n"
         "Run this on a machine with Docker or Podman and the vllm-sr CLI,\n"
-        "not inside the workshop lab, which already runs a Router.\n\n"
+        "not from the workshop lab's terminal, which runs inside the lab container.\n\n"
         "1. Update the two task-model endpoints in config.yaml.\n"
         "2. Run ./start.sh.\n"
         "3. Run the prompts in routing-tests.yaml.\n",
@@ -2004,9 +2004,10 @@ Launch Control exported your policy to:
   start.sh            validates and serves config.yaml
 ```
 
-Do not run `./start.sh` inside this lab. The lab already runs a Router on
-ports 8080 and 8898, and it has no Docker or Podman for `vllm-sr serve`.
-Here you can check that the exported file is valid:
+Do not run `./start.sh` from this lab's terminal. The terminal runs inside the
+lab's own container, which has no Docker or Podman for `vllm-sr serve`, and
+the lab Router already uses ports 8080 and 8898. Here you can check that the
+exported file is valid:
 
 ```bash
 cd /workspace/generated-config/my-semantic-router
