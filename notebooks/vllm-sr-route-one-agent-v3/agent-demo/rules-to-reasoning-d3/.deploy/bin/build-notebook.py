@@ -1935,6 +1935,8 @@ if launch_score and launch_score["passed"] == launch_score["total"]:
     start_script.chmod(0o755)
     (export_dir / "README.md").write_text(
         "# My Semantic Router\n\n"
+        "Run this on a machine with Docker or Podman and the vllm-sr CLI,\n"
+        "not inside the workshop lab, which already runs a Router.\n\n"
         "1. Update the two task-model endpoints in config.yaml.\n"
         "2. Run ./start.sh.\n"
         "3. Run the prompts in routing-tests.yaml.\n",
@@ -1993,13 +1995,28 @@ application must locate exact text such as PII spans.
         r"""
 ## Appendix — Run your own Router
 
-After Launch Control:
+Launch Control exported your policy to:
+
+```text
+/workspace/generated-config/my-semantic-router
+  config.yaml         the Router configuration
+  routing-tests.yaml  the six Launch Control prompts and expected routes
+  start.sh            validates and serves config.yaml
+```
+
+Do not run `./start.sh` inside this lab. The lab already runs a Router on
+ports 8080 and 8898, and it has no Docker or Podman for `vllm-sr serve`.
+Here you can check that the exported file is valid:
 
 ```bash
 cd /workspace/generated-config/my-semantic-router
+vllm-sr config validate --config config.yaml
 ```
 
-Edit only the task-model entries in `config.yaml`:
+If `vllm-sr` is not installed in this environment, skip that check.
+
+On your own machine with Docker or Podman and the `vllm-sr` CLI, copy the
+folder and edit only the task-model entries in `config.yaml`:
 
 ```text
 provider_model_id
@@ -2032,8 +2049,8 @@ curl http://127.0.0.1:8898/v1/chat/completions \
   }'
 ```
 
-The same configuration can be deployed through Docker or Kubernetes after
-replacing the workshop task-model endpoints.
+The same configuration can be deployed through Kubernetes after replacing the
+workshop task-model endpoints.
 """
     ),
 ]
