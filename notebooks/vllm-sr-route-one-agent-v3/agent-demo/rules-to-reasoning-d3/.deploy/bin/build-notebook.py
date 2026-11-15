@@ -2010,10 +2010,11 @@ Here you can check that the exported file is valid:
 
 ```bash
 cd /workspace/generated-config/my-semantic-router
-vllm-sr config validate --config config.yaml
+/opt/workshop-venv/bin/vllm-sr config validate --config config.yaml
 ```
 
-If `vllm-sr` is not installed in this environment, skip that check.
+It should print `Configuration is valid`. If that path does not exist in your
+environment, skip this check.
 
 On your own machine with Docker or Podman and the `vllm-sr` CLI, copy the
 folder and edit only the task-model entries in `config.yaml`:
