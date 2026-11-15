@@ -3,6 +3,10 @@ title: Single-MI300 Workshop Image and Kubernetes Lab Plan
 description: Runtime contract for one prebuilt participant image containing vLLM, vLLM-SR, Dashboard, Hermes, Jupyter, and observability.
 ---
 
+> On this branch (Azure Foundry, CPU-only lab VM) the two task models run on
+> Azure Foundry, not as vLLM servers in the image. Participants do not start
+> any model server.
+
 # Single-MI300 Workshop Image and Kubernetes Lab Plan
 
 > Architecture plan for the new workshop. This does not replace the repository's
@@ -212,10 +216,6 @@ invokes `/opt/workshop/bin/start-platform.sh`. The script reads this file and
 passes values directly to each platform process. Environment variables are
 documented but not typed during the workshop.
 
-The model-serving variables are loaded into every Jupyter terminal through the
-image's shell profile so participants can run the two real `vllm serve`
-commands without manually exporting ROCm or cache settings.
-
 ## Hermes contract
 
 Hermes supports custom OpenAI-compatible endpoints. Pin one tested Hermes
@@ -394,10 +394,8 @@ Container entrypoint:
 
 Participant commands:
 
-1. the displayed routine-model `vllm serve` command
-2. the displayed reasoning-model `vllm serve` command
-3. direct backend verification
-4. the first notebook code cell, which runs `services = lab.start_platform()`
+1. the first notebook code cell, which checks the two Azure Foundry
+   connections, the Router, the decision model and the Dashboard
 
 `start-platform.sh`:
 

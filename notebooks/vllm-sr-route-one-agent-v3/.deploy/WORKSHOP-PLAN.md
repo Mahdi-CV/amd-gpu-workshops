@@ -5,6 +5,11 @@ description: An application-first vLLM Semantic Router workshop using a preinsta
 
 # Route One Agent Across Two Models
 
+> On this branch (Azure Foundry, CPU-only lab VM) the two task models run on
+> Azure Foundry (`FW-Qwen3.8-27B` and `FW-GLM-5.3-Flash`), reached through the
+> local relay on ports 8002 and 8001. Participants do not start any model
+> server.
+
 > New workshop draft. The existing workshop files remain unchanged and are
 > retained as design references.
 
@@ -104,8 +109,8 @@ The workshop image also provides:
 /opt/workshop/bin/route-counts.sh
 ```
 
-These scripts hide platform wiring rather than model serving. Participants run
-the two real `vllm serve` commands themselves.
+These scripts hide platform wiring. The two task models run on Azure Foundry,
+so participants do not start any model server.
 
 ---
 
@@ -121,9 +126,8 @@ Read `README-FIRST.md`, then select:
 route-one-agent-across-two-models.ipynb
 ```
 
-The notebook opens with the architecture and the two real `vllm serve`
-commands. Health checks appear only after participants have launched those
-commands.
+The notebook opens with the architecture, then checks the connections to the
+two Azure Foundry models.
 
 No socket detection, package installation, service-address discovery, or
 environment-variable setup appears before the model-launch experience.
@@ -132,74 +136,23 @@ The Dashboard link in the notebook must use the Jupyter server's proxied
 application path or the workshop platform's equivalent same-session routing.
 It must not show container ports or cluster addresses to the participant.
 
-## 1. Start two models with vLLM
+## 1. Connect to the two models on Azure Foundry
 
 The instructor gives one sentence of context:
 
 > We will use a smaller model for routine work and a stronger model for work
 > that benefits from deeper reasoning.
 
-Open two Jupyter terminals. ROCm variables and model-cache locations are
-already configured by the image.
+Both models run on Azure Foundry. The lab container's relay forwards each
+route to its Foundry deployment:
 
-Terminal 1:
+| Route | Foundry deployment | Local relay |
+| --- | --- | --- |
+| Routine | `FW-Qwen3.8-27B` | `http://127.0.0.1:8002` |
+| Reasoning | `FW-GLM-5.3-Flash` | `http://127.0.0.1:8001` |
 
-```bash
-vllm serve google/gemma-4-12B-it \
-  --host 0.0.0.0 \
-  --port 8002 \
-  --served-model-name gemma-4-12b \
-  --gpu-memory-utilization 0.45 \
-  --max-model-len 32768 \
-  --max-num-seqs 16 \
-  --enable-auto-tool-choice \
-  --tool-call-parser gemma4
-```
-
-Terminal 2:
-
-```bash
-vllm serve Qwen/Qwen3.8-27B-FP8 \
-  --host 0.0.0.0 \
-  --port 8001 \
-  --served-model-name qwen3.8-27b \
-  --gpu-memory-utilization 0.47 \
-  --max-model-len 32768 \
-  --max-num-seqs 16 \
-  --enforce-eager \
-  --reasoning-parser qwen3 \
-  --enable-auto-tool-choice \
-  --tool-call-parser qwen3_xml
-```
-
-Participants see and run actual vLLM commands. The image hides only
-event-specific environment and cache setup, which remains inspectable under:
-
-```text
-/opt/workshop/config/
-```
-
-Verify each model directly:
-
-```bash
-curl --fail http://127.0.0.1:8002/v1/models
-curl --fail http://127.0.0.1:8001/v1/models
-```
-
-Then generate one short completion from each. Do not continue until direct
-generation succeeds.
-
-The notebook's first code cell loads the hidden environment helper, starts the
-routing platform, and reports:
-
-```text
-GPU                  ready  AMD Instinct MI300
-routine model        ready
-reasoning model      ready
-semantic router      ready
-dashboard            ready
-hermes               ready  model=vllm-sr/auto
-```
+The notebook's first code cell checks both connections, the Router, the
+decision model and the Dashboard, and prints a ✓ for each.
 
 ## 2. Explain the running routing platform
 
