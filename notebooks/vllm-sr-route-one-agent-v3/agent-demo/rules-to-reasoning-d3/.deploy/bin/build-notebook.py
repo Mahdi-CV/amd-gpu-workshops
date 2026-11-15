@@ -361,9 +361,14 @@ tagged_result = preview_route(tagged_security_request)
     ),
     md(
         r"""
-`preview_route` asks the Router which policy path would win without invoking a
-task model. That keeps this section focused on routing evidence rather than the
-quality or length of a generated answer.
+`preview_route` asks the Router which policy path would win and shows the
+evidence. It also sends the prompt through the Router once, with a very short
+answer, so every request appears in **Dashboard → Insights**. That keeps this
+section focused on routing evidence rather than the quality or length of a
+generated answer.
+
+Insights shows the requests sent since the last recipe change: applying a
+recipe reloads the Router and starts a new list.
 
 The application-facing model name remains `vllm-sr/auto`. A real application
 uses the standard chat-completions endpoint shown in the final appendix.
@@ -461,6 +466,29 @@ def _preview_selection(body):
     return decision, model
 
 
+def _record_in_insights(prompt):
+    # Send the prompt through the Router for real (short answer), so the
+    # request is recorded and appears in Dashboard -> Insights.
+    try:
+        response = requests.post(
+            f"{ROUTER_API}/v1/chat/completions",
+            json={
+                "model": ROUTED_MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "max_tokens": 16,
+            },
+            timeout=180,
+        )
+    except requests.RequestException as exc:
+        return {"recorded": False, "detail": type(exc).__name__}
+    if not response.ok:
+        return {"recorded": False, "detail": f"HTTP {response.status_code}"}
+    return {
+        "recorded": True,
+        "decision": response.headers.get("x-vsr-selected-decision"),
+    }
+
+
 def _preview_route(prompt):
     # Internal request used by the public preview and the final scorecard.
     response = requests.post(
@@ -481,12 +509,13 @@ def _preview_route(prompt):
         "task_model": model,
         "decision_ranking": body.get("decision_ranking", {}),
         "raw": body,
+        "insights": _record_in_insights(prompt),
     }
     return result
 
 
 def preview_route(prompt):
-    # Evaluate routing policy without asking a task model to generate.
+    # Show the routing evidence; the request is also recorded in Insights.
     result = _preview_route(prompt)
     print("=" * 72)
     print("PROMPT")
@@ -513,6 +542,11 @@ def preview_route(prompt):
         )
     print("Route:", result["route"])
     print("Task model:", result["task_model"])
+    insights = result["insights"]
+    if insights["recorded"]:
+        print("Dashboard → Insights: recorded as", insights["decision"])
+    else:
+        print("Dashboard → Insights: not recorded", f"({insights['detail']})")
     print("=" * 72)
     return result
 
