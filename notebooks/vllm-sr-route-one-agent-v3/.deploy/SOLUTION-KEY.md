@@ -138,55 +138,136 @@ exercise runs only when the model catalog includes a Vela 3.0 deployment.
 The Router serves only the models the active recipe uses, so the cell
 activates the PII recipe first; that starts Vela, and then the span call runs.
 
-## Launch Control challenge
+## Final challenge solutions
 
-One valid solution:
+Do not reveal a solution until participants have attempted the six acceptance
+prompts. The scorecard checks selected models, so more than one policy shape is
+valid.
+
+Measured with the pinned D3 Lite revision:
+
+| Prompt family | Broad question P(yes) | Comparison question P(yes) |
+| --- | ---: | ---: |
+| Routine rewrite | 0.09 | 0.01 |
+| Compare and recommend | 0.82 | 0.99 |
+| Diagnosis-only queue problem | 0.80 | 0.03 |
+| Simple `[INCIDENT]` update | 0.05 | 0.00 |
+| “incident” near miss | 0.10 | 0.01 |
+
+The current recipe therefore starts at `4/6`: diagnosis-only is over-routed
+and the explicit incident is under-routed.
+
+### Solution A — recommended: tune the question and add an incident decision
 
 ```python
-PRIVATE_PRIORITY = 400
-SECURITY_PRIORITY = 300
-SEMANTIC_PRIORITY = 200
+challenge_recipe = copy.deepcopy(private_recipe)
+
+challenge_recipe["signals"]["systemone"][0]["question"]["instructions"] = (
+    "Does the user ask to compare competing technical approaches "
+    "and recommend or justify one?"
+)
+
+challenge_recipe["signals"]["keywords"].append(
+    {
+        "name": "incident-marker",
+        "operator": "OR",
+        "keywords": ["[INCIDENT]"],
+        "case_sensitive": False,
+    }
+)
+
+challenge_recipe["decisions"].insert(
+    1,
+    {
+        "name": "incident-response",
+        "description": "Explicit incidents use the Reasoning route.",
+        "priority": 250,
+        "rules": {
+            "operator": "AND",
+            "conditions": [
+                {"type": "keyword", "name": "incident-marker"}
+            ],
+        },
+        "modelRefs": [
+            {"model": "reasoning-model", "use_reasoning": True}
+        ],
+        "algorithm": {"type": "static"},
+    },
+)
+
+apply_recipe(challenge_recipe)
 ```
 
-The routine fallback remains at priority `100`, giving:
+This gives:
 
 ```text
-private-local        400
-security-review      300
+private-local        300
+incident-response    250
 semantic-reasoning   200
 routine-fallback     100
 ```
 
-Expected:
+### Solution B — update the existing reasoning decision
 
-| Case | Decision | Model |
-| --- | --- | --- |
-| Launch update | `routine-fallback` | `routine-model` |
-| Architecture choice | `semantic-reasoning` | `reasoning-model` |
-| Security review | `security-review` | `reasoning-model` |
-| Private note | `private-local` | `routine-model` |
-| Private analysis | `private-local` | `routine-model` |
-| Three-way collision | `private-local` | `routine-model` |
+Add the same `incident-marker`, tune the D3 question, and change
+`semantic-reasoning` to match either source of evidence:
+
+```yaml
+rules:
+  operator: OR
+  on_unknown: no_match
+  conditions:
+    - type: keyword
+      name: incident-marker
+    - type: systemone
+      name: needs-deep-reasoning
+```
+
+This needs no new decision. The private decision still wins because its
+priority is higher.
+
+### Solution C — threshold-only D3 tuning
+
+On the pinned model, keeping the broad question and changing its threshold to
+approximately `0.81` separates the measured comparison (`0.82`) from the
+diagnosis-only prompt (`0.80`). Add the incident signal through Solution A or
+B.
+
+This passes the six tests but is fragile: the margin is small and should be
+recalibrated after any model, batching, or prompt-rendering change. Prefer
+changing the question because it expresses the requirement directly.
+
+### Solution D — add a second narrow System One signal
+
+Leave the broad signal in place, add a new `systemone` signal with the
+comparison-and-recommendation question, and make `semantic-reasoning` read the
+new signal. Then add the incident marker through a dedicated decision or an
+`OR` condition.
+
+This also passes, but it leaves unused or overlapping semantic evidence unless
+the broad signal serves another decision.
+
+### Behavior expected from every solution
+
+| Case | Required model |
+| --- | --- |
+| Routine control | `routine-model` |
+| Semantic comparison | `reasoning-model` |
+| Diagnosis only | `routine-model` |
+| Explicit incident | `reasoning-model` |
+| Near miss | `routine-model` |
+| Private incident | `routine-model` |
 
 Completion:
 
 ```text
-Score: 6/6
-Completion code: ROUTE-CONTROL-GREEN
+Challenge complete: 6/6 routing checks passed
 ```
 
-The challenge also saves:
-
-```text
-/workspace/generated-config/launch-control-recipe.yaml
-```
-
-Both the Python management-API path and Dashboard YAML path must activate the
-same four decisions. Any numeric values work if they preserve:
-
-```text
-private-local > security-review > semantic-reasoning > routine-fallback
-```
+Reject solutions that merely overfit the visible prompt wording with unrelated
+keywords. Accept different signal names, decision names, rule trees, or
+priorities when they express the application requirement and pass the
+scorecard.
 
 ## Recovery
 

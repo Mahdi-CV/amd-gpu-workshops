@@ -21,8 +21,8 @@ Participants will:
 4. recognize the limitation of exact matching;
 5. create and calibrate a D3 Lite System One question;
 6. combine semantic and deterministic policy;
-7. resolve a three-way priority collision;
-8. pass Launch Control; and
+7. update an existing recipe for changed application requirements;
+8. pass a six-prompt behavior-only routing challenge; and
 9. export a runnable Router starter.
 
 If time allows, participants also use Vela 3.0 to locate exact PII spans and
@@ -39,7 +39,7 @@ path.
 5. Test and customize the question
 6. Combine rules with priority
 7. Connect an application
-8. Complete Launch Control
+8. Tune the launch router from acceptance prompts
 9. Export the Router
 ```
 
@@ -94,7 +94,7 @@ visible.
 
 ## Timing
 
-The beginner path through Launch Control is approximately 100 minutes. A
+The beginner path through the final challenge is approximately 105 minutes. A
 75-minute delivery can reduce the Prompt Laboratory and make the narrower
 question instructor-led.
 
@@ -108,11 +108,14 @@ Before release:
 4. broad semantic routine and reasoning controls pass;
 5. the comparison-specific question passes positive and negative controls;
 6. the guided private collision selects semantic then private-local;
-7. all six Launch Control cases pass;
-8. the notebook executes from a clean kernel with challenge placeholders;
-9. Dashboard and management API show the same active configuration;
-10. the exported package uses `vllm-sr/d3-lite`; and
-11. the acceptance test restores the starter configuration.
+7. the unmodified private recipe begins the challenge at exactly 4/6;
+8. at least the four documented valid solution shapes pass all six challenge
+   prompts;
+9. the notebook executes from a clean kernel with the challenge unfinished but
+   without a Python exception;
+10. Dashboard and management API show the same active configuration;
+11. the exported package uses `vllm-sr/d3-lite`; and
+12. the acceptance test restores the starter configuration.
 
 When the optional extension is included, also verify that Vela returns
 `PERSON`, `EMAIL_ADDRESS`, and `PHONE_NUMBER`, and that `pii-local` wins.

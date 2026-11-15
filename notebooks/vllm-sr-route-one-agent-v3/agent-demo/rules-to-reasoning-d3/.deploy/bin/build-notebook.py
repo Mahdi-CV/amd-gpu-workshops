@@ -1558,323 +1558,195 @@ the challenge.
     ),
     md(
         r"""
-## Final challenge — Keep Launch Control green
+## Final challenge — Tune the launch router
 
-It is 02:00 UTC during a production launch. Six requests arrive through the
-same endpoint.
+You have joined a release-engineering team whose Router already uses the
+`private_recipe` from the previous section.
 
-Your policy must satisfy four requirements:
+Evaluation found two gaps:
 
-1. `[PRIVATE]` must stay on the Routine route.
-2. `[SECURITY-REVIEW]` should use the Reasoning route unless privacy also matches.
-3. Untagged requests needing comparison, diagnosis, or a justified plan should
-   use semantic reasoning.
-4. Everything else should use the Routine route.
+1. The broad D3 question sends diagnosis-only work to the Reasoning route.
+   The new policy should use semantic reasoning only when an untagged request
+   compares alternatives and asks for a recommendation or justification.
+2. The incident console now adds an exact `[INCIDENT]` marker. Those requests
+   must use the Reasoning route even when the request itself is simple.
 
-The hardest request matches all three specific policies:
+The existing private rule remains mandatory: `[PRIVATE]` must still use the
+Routine route, including when `[INCIDENT]` and semantic reasoning also match.
 
-<div style="border:3px solid #e34d59;border-radius:12px;padding:16px 19px;margin:16px 0;background:#fff6f6">
-  <div style="font-size:12px;font-weight:800;letter-spacing:.12em;color:#8d2230">THREE-WAY COLLISION PROMPT</div>
-  <div style="font-size:17px;font-weight:800;margin-top:6px;color:#43151b">[PRIVATE] [SECURITY-REVIEW] Investigate leaked credentials, compare containment strategies, and recommend a rollout.</div>
-</div>
+Start from the policy you already built. You may:
 
-Choose priorities for:
+- tune an existing signal or predicate;
+- modify an existing decision;
+- add a signal;
+- add a decision; or
+- choose another valid rule-tree design.
 
-```text
-private-local
-security-review
-semantic-reasoning
-routine-fallback (already 100)
-```
-
-Then choose how to deploy:
-
-```text
-python     → apply the recipe through the management API
-dashboard  → import the generated YAML in Routing → Builder
-```
+More than one Router policy can satisfy the requirement. The scorecard checks
+the selected model, not one required signal name, decision name, or priority.
 """
     ),
     code(
         r"""
-# Replace None with priorities that express the requirements.
-PRIVATE_PRIORITY = None
-SECURITY_PRIORITY = None
-SEMANTIC_PRIORITY = None
-CHALLENGE_DEPLOY_METHOD = "python"  # or "dashboard"
+challenge_prompts = {
+    "routine_control": (
+        "Rewrite this launch update clearly: rollout paused at 40 percent "
+        "while the team checks elevated retry volume."
+    ),
+    "semantic_comparison": (
+        "Compare canary and blue-green deployment for a small team, "
+        "recommend one, and justify the recommendation."
+    ),
+    "diagnosis_only": (
+        "Our queue workers are processing some jobs twice. Diagnose the "
+        "problem and propose the first debugging steps."
+    ),
+    "explicit_incident": (
+        "[INCIDENT] Summarize the current outage status in three bullets "
+        "for the incident commander."
+    ),
+    "near_miss": "Define an incident commander in one sentence.",
+    "private_incident": (
+        "[PRIVATE] [INCIDENT] Compare containment strategies for leaked "
+        "credentials and recommend a rollout."
+    ),
+}
 
-if None in (PRIVATE_PRIORITY, SECURITY_PRIORITY, SEMANTIC_PRIORITY):
-    print("Choose all three priorities, then rerun this cell.")
-    print("The routine fallback already has priority 100.")
-    launch_recipe = None
-    launch_recipe_path = None
+for name, prompt in challenge_prompts.items():
+    print(f"{name}: {prompt}")
+"""
+    ),
+    md(
+        r"""
+Before editing the policy, predict which model should handle each request.
+
+| Request | Required model |
+| --- | --- |
+| Routine control | `routine-model` |
+| Semantic comparison and recommendation | `reasoning-model` |
+| Diagnosis without comparison or recommendation | `routine-model` |
+| Explicit `[INCIDENT]` request | `reasoning-model` |
+| Ordinary use of the word “incident” | `routine-model` |
+| Private incident and semantic collision | `routine-model` |
+
+### Hints
+
+1. Start from `private_recipe`; do not rebuild providers, listeners, or the
+   model catalog.
+2. The existing System One question is broader than the new semantic-routing
+   requirement. You can tune its instructions or predicate, or replace which
+   semantic evidence the decision reads.
+3. One prompt contains an exact application fact that D3 should not have to
+   infer.
+4. A signal alone does not change routing. A decision must use it, or an
+   existing decision must be updated to use it.
+5. The private route must still win when several policies match.
+6. Infer the signal details and policy shape from the six prompts.
+
+For Python, copy and modify the previous recipe:
+
+```python
+challenge_recipe = copy.deepcopy(private_recipe)
+
+# Modify challenge_recipe.
+# Then validate and deploy it:
+apply_recipe(challenge_recipe)
+```
+
+For Dashboard:
+
+1. Import `generated-config/05-private-recipe.yaml` in
+   **Routing → Builder**.
+2. Modify the signals and decisions.
+3. Select **Compile**, inspect the result, and select **Deploy**.
+
+Run the scorecard without changing its expected models. You may run it once
+before editing to see which two requirements the current recipe misses.
+"""
+    ),
+    code(
+        r"""
+# Python workspace for the challenge.
+challenge_recipe = copy.deepcopy(private_recipe)
+
+# Modify challenge_recipe here using the signals and decisions you built in
+# the earlier sections.
+#
+# When your policy is ready, deploy it with:
+# apply_recipe(challenge_recipe)
+#
+# Or edit and deploy the imported 05-private-recipe.yaml in Dashboard.
+"""
+    ),
+    code(
+        r"""
+CHALLENGE_EXPECTED_MODELS = {
+    "routine_control": "routine-model",
+    "semantic_comparison": "reasoning-model",
+    "diagnosis_only": "routine-model",
+    "explicit_incident": "reasoning-model",
+    "near_miss": "routine-model",
+    "private_incident": "routine-model",
+}
+
+challenge_results = {
+    name: _preview_route(prompt)
+    for name, prompt in challenge_prompts.items()
+}
+
+failures = []
+for name, expected_model in CHALLENGE_EXPECTED_MODELS.items():
+    observed = challenge_results[name]
+    actual_model = observed["task_model"]
+    marker = "✓" if actual_model == expected_model else "✗"
+    print(
+        f"{marker} {name:22} "
+        f"{observed['decision']} → {actual_model} "
+        f"(expected {expected_model})"
+    )
+    if actual_model != expected_model:
+        failures.append(
+            f"{name}: observed {actual_model}, expected {expected_model}"
+        )
+
+challenge_score = {
+    "passed": len(CHALLENGE_EXPECTED_MODELS) - len(failures),
+    "total": len(CHALLENGE_EXPECTED_MODELS),
+    "results": challenge_results,
+    "failures": failures,
+}
+
+print()
+if failures:
+    print(
+        "Challenge not complete:",
+        f"{challenge_score['passed']}/{challenge_score['total']} checks passed",
+    )
+    for failure in failures:
+        print("  ", failure)
 else:
-    launch_recipe = copy.deepcopy(semantic_recipe)
-    launch_recipe["signals"]["keywords"] = [
-        {
-            "name": "private-marker",
-            "operator": "OR",
-            "keywords": ["[PRIVATE]"],
-            "case_sensitive": False,
-        },
-        {
-            "name": "security-review-marker",
-            "operator": "OR",
-            "keywords": ["[SECURITY-REVIEW]"],
-            "case_sensitive": False,
-        },
-    ]
-    launch_recipe["decisions"] = [
-        {
-            "name": "private-local",
-            "description": "Private requests must stay on the Routine route.",
-            "priority": PRIVATE_PRIORITY,
-            "rules": {
-                "operator": "AND",
-                "conditions": [
-                    {"type": "keyword", "name": "private-marker"}
-                ],
-            },
-            "modelRefs": [{"model": "routine-model"}],
-            "algorithm": {"type": "static"},
-        },
-        {
-            "name": "security-review",
-            "description": "Explicit security reviews use the Reasoning route.",
-            "priority": SECURITY_PRIORITY,
-            "rules": {
-                "operator": "AND",
-                "conditions": [
-                    {
-                        "type": "keyword",
-                        "name": "security-review-marker",
-                    }
-                ],
-            },
-            "modelRefs": [
-                {
-                    "model": "reasoning-model",
-                    "use_reasoning": True,
-                }
-            ],
-            "algorithm": {"type": "static"},
-        },
-        {
-            **copy.deepcopy(semantic_recipe["decisions"][0]),
-            "priority": SEMANTIC_PRIORITY,
-        },
-        copy.deepcopy(semantic_recipe["decisions"][1]),
-    ]
-
-    launch_recipe_path = (
-        generated_config_dir / "launch-control-recipe.yaml"
-    )
-    launch_recipe_path.write_text(
-        yaml.safe_dump(
-            {
-                "recipes": [
-                    {
-                        "name": "default",
-                        "strategy": "priority",
-                        **copy.deepcopy(launch_recipe),
-                    }
-                ]
-            },
-            sort_keys=False,
-        ),
-        encoding="utf-8",
-    )
-    print("Saved Launch Control recipe:")
-    print(launch_recipe_path)
-
-    if CHALLENGE_DEPLOY_METHOD == "python":
-        apply_recipe(launch_recipe)
-    elif CHALLENGE_DEPLOY_METHOD == "dashboard":
-        print()
-        print("Import this YAML in Dashboard → Routing → Builder.")
-        print("Compile and Deploy it, then run the scorecard.")
-    else:
-        raise ValueError(
-            "CHALLENGE_DEPLOY_METHOD must be 'python' or 'dashboard'"
-        )
+    print("Challenge complete: 6/6 routing checks passed")
 """
     ),
     md(
         r"""
-<details>
-<summary><b>Hint 1 — reason from constraints</b></summary>
-
-Privacy is a hard boundary, so it must outrank every route that can send a
-request to the reasoning model.
-
-The explicit security-review rule should outrank the general semantic rule.
-
-</details>
-
-<details>
-<summary><b>Hint 2 — required ordering</b></summary>
+You have finished the challenge only when the notebook prints:
 
 ```text
-private-local
-> security-review
-> semantic-reasoning
-> routine-fallback
+Challenge complete: 6/6 routing checks passed
 ```
 
-You choose the numeric values.
+Show the passing cell to the presenter. Then open the six records under
+**Dashboard → Insights** and explain why each request selected its model.
 
-</details>
-"""
-    ),
-    md(
-        r"""
-### Launch Control test traffic
-
-The scorecard verifies both the decision and task model.
-
-| Case | **Prompt** | Required decision |
-| --- | --- | --- |
-| Launch update | **Rewrite this launch update clearly: rollout paused at 40 percent while the team checks elevated retry volume.** | `routine-fallback` |
-| Architecture | **Compare canary, blue-green, and rolling deployment. Recommend one and justify rollback criteria.** | `semantic-reasoning` |
-| Security review | **`[SECURITY-REVIEW]` Our API accepts old and new signing keys for 24 hours during rotation. Identify attack paths and recommend mitigations.** | `security-review` |
-| Private note | **`[PRIVATE]` Summarize an overdue-invoice note.** | `private-local` |
-| Private analysis | **`[PRIVATE]` Compare customer-recovery options and recommend a rollout.** | `private-local` |
-| Three-way collision | **`[PRIVATE] [SECURITY-REVIEW]` Investigate leaked credentials and recommend a rollout.** | `private-local` |
+A production incident or privacy policy needs stronger controls than one
+prompt marker. This challenge tests the Router structure: exact application
+facts, semantic evidence, decisions, priority, and behavior-driven validation.
 """
     ),
     code(
         r"""
-launch_cases = {
-    "launch_update": {
-        "prompt": (
-            "Rewrite this launch update clearly: rollout paused at 40 percent "
-            "while the team checks elevated retry volume."
-        ),
-        "decision": "routine-fallback",
-        "model": "routine-model",
-    },
-    "architecture": {
-        "prompt": (
-            "Compare canary, blue-green, and rolling deployment for this "
-            "service. Recommend one and justify rollback criteria."
-        ),
-        "decision": "semantic-reasoning",
-        "model": "reasoning-model",
-    },
-    "security_review": {
-        "prompt": (
-            "[SECURITY-REVIEW] Our API accepts old and new signing keys for "
-            "24 hours during rotation. Identify attack paths and recommend mitigations."
-        ),
-        "decision": "security-review",
-        "model": "reasoning-model",
-    },
-    "private_note": {
-        "prompt": (
-            "[PRIVATE] ACCOUNT-ID 4821: summarize this payment note in one "
-            "sentence: the invoice is 12 days overdue."
-        ),
-        "decision": "private-local",
-        "model": "routine-model",
-    },
-    "private_analysis": {
-        "prompt": (
-            "[PRIVATE] Compare three customer-recovery options, explain their "
-            "tradeoffs, and recommend a rollout."
-        ),
-        "decision": "private-local",
-        "model": "routine-model",
-    },
-    "three_way_collision": {
-        "prompt": (
-            "[PRIVATE] [SECURITY-REVIEW] Investigate leaked credentials, "
-            "compare containment strategies, and recommend a rollout."
-        ),
-        "decision": "private-local",
-        "model": "routine-model",
-    },
-}
-
-active = requests.get(f"{MANAGEMENT_API}/api/v1/config", timeout=30)
-active.raise_for_status()
-active_recipe = next(
-    item
-    for item in active.json().get("recipes", [])
-    if item.get("name") == "default"
-)
-active_decisions = {
-    item.get("name")
-    for item in active_recipe.get("decisions", [])
-}
-launch_decisions = {
-    "private-local",
-    "security-review",
-    "semantic-reasoning",
-    "routine-fallback",
-}
-
-if launch_recipe is None:
-    print("Build and activate the Launch Control recipe first.")
-    launch_score = None
-elif not launch_decisions.issubset(active_decisions):
-    print("The Launch Control recipe is not active yet.")
-    print("Deploy the generated YAML in Dashboard, then rerun this cell:")
-    print(launch_recipe_path)
-    launch_score = None
-else:
-    passed = 0
-    launch_results = {}
-    for name, case in launch_cases.items():
-        observed = _preview_route(case["prompt"])
-        ok = (
-            observed["decision"] == case["decision"]
-            and observed["task_model"] == case["model"]
-        )
-        passed += int(ok)
-        launch_results[name] = observed
-        marker = "✓" if ok else "✗"
-        print(
-            f"{marker} {name:20} "
-            f"{observed['decision']} → {observed['task_model']}"
-        )
-
-    launch_score = {
-        "passed": passed,
-        "total": len(launch_cases),
-        "results": launch_results,
-    }
-    print()
-    print(f"Score: {passed}/{len(launch_cases)}")
-    if passed == len(launch_cases):
-        print("Completion code: ROUTE-CONTROL-GREEN")
-"""
-    ),
-    md(
-        r"""
-Launch Control is green only when the notebook prints:
-
-```text
-Score: 6/6
-Completion code: ROUTE-CONTROL-GREEN
-```
-
-Explain the three-way collision:
-
-```text
-which facts matched
-→ which decisions were eligible
-→ why private-local won
-→ which task model served the request
-```
-"""
-    ),
-    code(
-        r"""
-if launch_score and launch_score["passed"] == launch_score["total"]:
-    collision = preview_route(
-        launch_cases["three_way_collision"]["prompt"]
-    )
-
+if challenge_score["passed"] == challenge_score["total"]:
     export_dir = Path("/workspace/generated-config/my-semantic-router")
     export_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1913,11 +1785,11 @@ if launch_score and launch_score["passed"] == launch_score["total"]:
                 "cases": [
                     {
                         "name": name,
-                        "prompt": case["prompt"],
-                        "expected_decision": case["decision"],
-                        "expected_model": case["model"],
+                        "prompt": challenge_prompts[name],
+                        "expected_model": expected_model,
                     }
-                    for name, case in launch_cases.items()
+                    for name, expected_model
+                    in CHALLENGE_EXPECTED_MODELS.items()
                 ],
             },
             sort_keys=False,
@@ -1939,7 +1811,7 @@ if launch_score and launch_score["passed"] == launch_score["total"]:
         "not from the workshop lab's terminal, which runs inside the lab container.\n\n"
         "1. Update the two task-model endpoints in config.yaml.\n"
         "2. Run ./start.sh.\n"
-        "3. Run the prompts in routing-tests.yaml.\n",
+        "3. Run the six acceptance prompts in routing-tests.yaml.\n",
         encoding="utf-8",
     )
     print("Exported:", export_dir)
@@ -1966,6 +1838,11 @@ natural-language meaning
 overlapping rules
 → priority
 → one winning route
+
+changed application requirements
+→ tune existing semantic evidence
+→ add exact policy where needed
+→ verify behavior with acceptance prompts
 ```
 
 The learning goal is not memorizing YAML. It is translating an application
@@ -1995,12 +1872,12 @@ application must locate exact text such as PII spans.
         r"""
 ## Appendix — Run your own Router
 
-Launch Control exported your policy to:
+A passing final challenge exported your policy to:
 
 ```text
 /workspace/generated-config/my-semantic-router
   config.yaml         the Router configuration
-  routing-tests.yaml  the six Launch Control prompts and expected routes
+  routing-tests.yaml  the six challenge prompts and expected models
   start.sh            validates and serves config.yaml
 ```
 

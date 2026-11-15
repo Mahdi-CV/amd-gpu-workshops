@@ -25,7 +25,8 @@ They should distinguish:
 
 ## Recommended timing
 
-The beginner path, including Launch Control, is approximately 100 minutes.
+The beginner path, including the final tuning challenge, is approximately
+105 minutes.
 The optional Vela PII span extension adds about 10 minutes.
 
 | Segment | Minutes | Running total |
@@ -38,14 +39,14 @@ The optional Vela PII span extension adds about 10 minutes.
 | Prompt Laboratory and customization | 15 | 75 |
 | Priority collision | 10 | 85 |
 | Application integration | 5 | 90 |
-| Launch Control | 10 | 100 |
+| Tune the launch router | 15 | 105 |
 
 For a 75-minute delivery:
 
 - prestart the container before participants arrive;
 - use four Prompt Laboratory prompts;
 - keep the narrower-question exercise instructor-led; and
-- preserve Launch Control as the closing exercise.
+- preserve the six-prompt tuning challenge as the closing exercise.
 
 ## Presenter principles
 
@@ -91,11 +92,10 @@ WORKSHOP_E2E_CONFIRM_MUTATION=1 \
   python3 /opt/workshop/bin/verify-notebook-e2e.py
 ```
 
-Expected final lines:
+Final acceptance target:
 
 ```text
-PASS Launch Control -> ROUTE-CONTROL-GREEN
-PASS baseline restored
+Challenge complete: 6/6 routing checks passed
 ```
 
 ## Run of show
@@ -249,32 +249,55 @@ when this recipe is activated; on the Microsoft VM it stops after the first
 `apply_recipe` in Section 1 and is not available until then. Skip the
 extension if the catalog has no Vela deployment.
 
-### Launch Control
+### Final challenge: tune the launch router
 
-Participants infer:
+Frame this as a change request against the working `private_recipe`, not a
+blank configuration exercise.
 
-```text
-private > security > semantic > fallback
-```
-
-One valid solution is:
+The participants receive six prompts and required model outcomes. The current
+recipe should pass four and fail two:
 
 ```text
-400 private-local
-300 security-review
-200 semantic-reasoning
-100 routine-fallback
+diagnosis-only       currently reasoning, required routine
+explicit [INCIDENT]  currently routine, required reasoning
 ```
+
+Give only these hints:
+
+```text
+start from private_recipe
+tune existing semantic evidence
+add exact application evidence where needed
+a signal alone does not change routing
+private behavior must remain intact
+```
+
+Participants may modify an existing decision or add a new one. Do not require
+specific signal names, decision names, or priorities; the scorecard checks the
+selected model.
+
+Do not reveal the comparison-specific question or `[INCIDENT]` signal before
+participants attempt the challenge. If the room is blocked:
+
+1. first point out that diagnosis and comparison are different requirements;
+2. then point out that brackets indicate an exact application fact;
+3. only then show one recommended policy shape.
+
+The presenter-only solution key documents four passing solutions, including:
+
+- a dedicated incident decision;
+- an `OR` branch on the existing reasoning decision;
+- threshold-only tuning on the pinned model; and
+- a second narrow System One signal.
 
 Completion requires:
 
 ```text
-Score: 6/6
-Completion code: ROUTE-CONTROL-GREEN
+Challenge complete: 6/6 routing checks passed
 ```
 
-Ask the participant to explain the three-way collision, not merely show the
-completion code.
+Afterward, open the six records in Dashboard Insights and ask participants to
+explain the observed decisions, especially the private incident collision.
 
 ## Troubleshooting
 

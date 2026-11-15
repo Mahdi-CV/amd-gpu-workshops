@@ -28,10 +28,6 @@ ROUTER_API = os.getenv(
     "ROUTER_API",
     "http://127.0.0.1:8898",
 ).rstrip("/")
-DECISION_MODEL_ENDPOINT = os.getenv(
-    "DECISION_MODEL_ENDPOINT",
-    "http://127.0.0.1:8100",
-).rstrip("/")
 EVIDENCE_DIR = Path(
     os.getenv(
         "WORKSHOP_E2E_EVIDENCE_DIR",
@@ -321,47 +317,32 @@ def private_recipe() -> dict:
     return recipe
 
 
-def launch_recipe() -> dict:
-    recipe = semantic_recipe()
-    recipe["signals"]["keywords"] = [
+def challenge_recipe() -> dict:
+    recipe = private_recipe()
+    recipe["signals"]["systemone"][0]["question"]["instructions"] = (
+        "Does the user ask to compare competing technical approaches "
+        "and recommend or justify one?"
+    )
+    recipe["signals"]["keywords"].append(
         {
-            "name": "private-marker",
+            "name": "incident-marker",
             "operator": "OR",
-            "keywords": ["[PRIVATE]"],
+            "keywords": ["[INCIDENT]"],
             "case_sensitive": False,
-        },
+        }
+    )
+    recipe["decisions"].insert(
+        1,
         {
-            "name": "security-review-marker",
-            "operator": "OR",
-            "keywords": ["[SECURITY-REVIEW]"],
-            "case_sensitive": False,
-        },
-    ]
-    recipe["decisions"] = [
-        {
-            "name": "private-local",
-            "priority": 400,
+            "name": "incident-response",
+            "description": "Explicit incidents use the reasoning route.",
+            "priority": 250,
             "rules": {
                 "operator": "AND",
                 "conditions": [
                     {
                         "type": "keyword",
-                        "name": "private-marker",
-                    }
-                ],
-            },
-            "modelRefs": [{"model": "routine-model"}],
-            "algorithm": {"type": "static"},
-        },
-        {
-            "name": "security-review",
-            "priority": 300,
-            "rules": {
-                "operator": "AND",
-                "conditions": [
-                    {
-                        "type": "keyword",
-                        "name": "security-review-marker",
+                        "name": "incident-marker",
                     }
                 ],
             },
@@ -373,14 +354,7 @@ def launch_recipe() -> dict:
             ],
             "algorithm": {"type": "static"},
         },
-        {
-            **copy.deepcopy(
-                semantic_recipe()["decisions"][0]
-            ),
-            "priority": 200,
-        },
-        fallback_decision(),
-    ]
+    )
     return recipe
 
 
@@ -388,7 +362,6 @@ def main() -> None:
     services = {
         "routine": "http://127.0.0.1:8002/v1/models",
         "reasoning": "http://127.0.0.1:8001/v1/models",
-        "d3-lite": f"{DECISION_MODEL_ENDPOINT}/health",
         "router": f"{ROUTER_API}/v1/models",
         "management": f"{MANAGEMENT_API}/health",
     }
@@ -398,6 +371,28 @@ def main() -> None:
         print(f"PASS service ready: {name}")
 
     baseline, _ = active_config_with_etag()
+    decision_deployment = (
+        baseline.get("global", {})
+        .get("model_catalog", {})
+        .get("system", {})
+        .get("decision_model", {})
+        .get("deployment")
+        or "d3-lite"
+    )
+    deployments = requests.get(
+        f"{MANAGEMENT_API}/api/v1/diagnostics/models/systemone",
+        timeout=30,
+    )
+    deployments.raise_for_status()
+    if not any(
+        item.get("id") == decision_deployment and item.get("ready")
+        for item in deployments.json().get("deployments", [])
+    ):
+        raise RuntimeError(
+            f"Decision deployment {decision_deployment!r} is not ready."
+        )
+    print(f"PASS decision model ready: {decision_deployment}")
+
     evidence: dict[str, object] = {
         "started_at": time.time(),
         "threshold": DECISION_THRESHOLD,
@@ -487,9 +482,8 @@ def main() -> None:
             ),
         }
 
-        apply_recipe(launch_recipe())
-        cases = {
-            "launch_update": {
+        challenge_prompts = {
+            "routine_control": {
                 "prompt": (
                     "Rewrite this launch update clearly: rollout paused "
                     "at 40 percent while the team checks elevated retry "
@@ -498,58 +492,73 @@ def main() -> None:
                 "decision": "routine-fallback",
                 "model": "routine-model",
             },
-            "architecture": {
+            "semantic_comparison": {
                 "prompt": (
-                    "Compare canary, blue-green, and rolling deployment "
-                    "for this service. Recommend one and justify rollback "
-                    "criteria."
+                    "Compare canary and blue-green deployment for a "
+                    "small team, recommend one, and justify the "
+                    "recommendation."
                 ),
                 "decision": "semantic-reasoning",
                 "model": "reasoning-model",
             },
-            "security_review": {
+            "diagnosis_only": {
                 "prompt": (
-                    "[SECURITY-REVIEW] Review the token-rotation design, "
-                    "identify attack paths, and recommend mitigations."
+                    "Our queue workers are processing some jobs twice. "
+                    "Diagnose the problem and propose the first debugging "
+                    "steps."
                 ),
-                "decision": "security-review",
+                "decision": "routine-fallback",
+                "model": "routine-model",
+            },
+            "explicit_incident": {
+                "prompt": (
+                    "[INCIDENT] Summarize the current outage status in "
+                    "three bullets for the incident commander."
+                ),
+                "decision": "incident-response",
                 "model": "reasoning-model",
             },
-            "private_note": {
-                "prompt": (
-                    "[PRIVATE] ACCOUNT-ID 4821: summarize this payment "
-                    "note in one sentence: the invoice is 12 days overdue."
-                ),
-                "decision": "private-local",
+            "near_miss": {
+                "prompt": "Define an incident commander in one sentence.",
+                "decision": "routine-fallback",
                 "model": "routine-model",
             },
-            "private_analysis": {
+            "private_incident": {
                 "prompt": (
-                    "[PRIVATE] Compare three customer-recovery options, "
-                    "explain their tradeoffs, and recommend a rollout."
-                ),
-                "decision": "private-local",
-                "model": "routine-model",
-            },
-            "three_way_collision": {
-                "prompt": (
-                    "[PRIVATE] [SECURITY-REVIEW] Investigate leaked "
-                    "credentials, compare containment strategies, and "
-                    "recommend a rollout."
+                    "[PRIVATE] [INCIDENT] Compare containment strategies "
+                    "for leaked credentials and recommend a rollout."
                 ),
                 "decision": "private-local",
                 "model": "routine-model",
             },
         }
-        evidence["launch_control"] = {
+
+        # The unmodified private recipe must expose both challenge gaps.
+        baseline_results = {
+            name: preview(case["prompt"])
+            for name, case in challenge_prompts.items()
+        }
+        baseline_passed = sum(
+            baseline_results[name]["selected_model"] == case["model"]
+            for name, case in challenge_prompts.items()
+        )
+        if baseline_passed != 4:
+            raise RuntimeError(
+                "The challenge baseline must begin at 4/6, "
+                f"observed {baseline_passed}/6."
+            )
+        print("PASS challenge baseline -> 4/6")
+
+        apply_recipe(challenge_recipe())
+        evidence["final_challenge"] = {
             name: require_route(
                 case["prompt"],
                 decision=case["decision"],
                 model=case["model"],
             )
-            for name, case in cases.items()
+            for name, case in challenge_prompts.items()
         }
-        print("PASS Launch Control -> ROUTE-CONTROL-GREEN")
+        print("PASS final challenge -> 6/6")
 
         EVIDENCE_DIR.mkdir(parents=True, exist_ok=True)
         output = EVIDENCE_DIR / "route-one-d3-lite-e2e.json"

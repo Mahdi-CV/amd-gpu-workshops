@@ -64,6 +64,7 @@ WORKSHOP_E2E_CONFIRM_MUTATION=1 \
 Expected:
 
 ```text
-PASS Launch Control -> ROUTE-CONTROL-GREEN
+PASS challenge baseline -> 4/6
+PASS final challenge -> 6/6
 PASS baseline restored
 ```

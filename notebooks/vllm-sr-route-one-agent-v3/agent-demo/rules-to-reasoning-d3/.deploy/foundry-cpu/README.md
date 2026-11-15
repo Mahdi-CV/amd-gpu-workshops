@@ -101,7 +101,8 @@ WORKSHOP_E2E_CONFIRM_MUTATION=1 \
 Expected:
 
 ```text
-PASS Launch Control -> ROUTE-CONTROL-GREEN
+PASS challenge baseline -> 4/6
+PASS final challenge -> 6/6
 PASS baseline restored
 ```
 
@@ -110,5 +111,6 @@ The acceptance test covers:
 - exact keyword routing;
 - broad D3 Lite semantic routing;
 - a narrower custom question;
-- private-policy priority; and
-- all six Launch Control cases.
+- private-policy priority;
+- the intentionally failing `4/6` challenge baseline; and
+- all six final challenge cases after semantic tuning and incident handling.
