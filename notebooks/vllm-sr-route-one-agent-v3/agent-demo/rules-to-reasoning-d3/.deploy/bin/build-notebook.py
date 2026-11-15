@@ -199,16 +199,11 @@ REASONING_FOUNDRY_MODEL = os.getenv(
     "REASONING_PROVIDER_MODEL",
     "FW-GLM-5.3-Flash",
 )
-DECISION_MODEL_ENDPOINT = os.getenv(
-    "DECISION_MODEL_ENDPOINT",
-    "http://127.0.0.1:8100",
-)
 ROUTED_MODEL = "vllm-sr/auto"
 
 services = {
     "Routine Foundry connection": f"{ROUTINE_ENDPOINT}/v1/models",
     "Reasoning Foundry connection": f"{REASONING_ENDPOINT}/v1/models",
-    "D3 Lite decision model": f"{DECISION_MODEL_ENDPOINT}/health",
     "Semantic Router": f"{ROUTER_API}/v1/models",
     "Router management API": f"{MANAGEMENT_API}/health",
     "Dashboard": "http://127.0.0.1:9000",
@@ -224,6 +219,21 @@ for name, url in services.items():
     except requests.RequestException as exc:
         service_status[name] = False
         print(f"✗ {name}: {type(exc).__name__}")
+
+# D3 Lite runs inside the Router, so ask the Router whether it is loaded.
+try:
+    deployments = requests.get(
+        f"{MANAGEMENT_API}/api/v1/diagnostics/models/systemone",
+        timeout=10,
+    ).json().get("deployments", [])
+    d3_ready = any(
+        item.get("id") == "d3-lite" and item.get("ready")
+        for item in deployments
+    )
+except requests.RequestException:
+    d3_ready = False
+service_status["D3 Lite decision model"] = d3_ready
+print(f"{'✓' if d3_ready else '✗'} D3 Lite decision model")
 
 print()
 print("Configured task-model connections:")
