@@ -241,10 +241,13 @@ fictional PII prompt
 -> Routine route
 ```
 
-The notebook discovers either `vela3-fast` or another ready Vela deployment
-name automatically. It saves `06-vela-pii-recipe.yaml`, which can also be
-imported through Dashboard Builder. Skip the extension if no ready
-span-capable Vela deployment appears.
+The notebook finds the Vela deployment in the model catalog, whether it is
+named `vela3-fast` or something else. It saves `06-vela-pii-recipe.yaml`,
+which can also be imported through Dashboard Builder, and activates it.
+The Router serves only the models the active recipe uses, so Vela starts
+when this recipe is activated; on the Microsoft VM it stops after the first
+`apply_recipe` in Section 1 and is not available until then. Skip the
+extension if the catalog has no Vela deployment.
 
 ### Launch Control
 
@@ -300,8 +303,16 @@ Inspect the model capabilities:
 curl -s http://127.0.0.1:8080/api/v1/diagnostics/models/systemone
 ```
 
-The optional section needs a ready Vela deployment whose `question_types`
-contains `span`.
+The optional section needs a Vela deployment in the model catalog:
+
+```bash
+curl -s http://127.0.0.1:8080/api/v1/config \
+  | python3 -c 'import json,sys; print(list(json.load(sys.stdin)["global"]["model_catalog"]["deployments"]))'
+```
+
+The diagnostics list above shows only the models the active recipe uses, so
+Vela is missing from it until the PII recipe is active. A span call made
+before that returns `The selected deployment is not published`.
 
 ### A Foundry model connection is missing
 

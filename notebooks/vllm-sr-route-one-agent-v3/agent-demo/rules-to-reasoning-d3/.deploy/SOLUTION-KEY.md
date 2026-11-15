@@ -132,7 +132,9 @@ The notebook saves:
 ```
 
 This is optional because raw D3 Lite does not answer span questions. The
-exercise runs only when a ready Vela 3.0 deployment is available.
+exercise runs only when the model catalog includes a Vela 3.0 deployment.
+The Router serves only the models the active recipe uses, so the cell
+activates the PII recipe first; that starts Vela, and then the span call runs.
 
 ## Launch Control
 

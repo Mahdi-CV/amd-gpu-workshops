@@ -1360,8 +1360,9 @@ that no detected PII category is ignored.
   <div style="margin-top:7px"><b>Use Vela 3.0 for exact PII spans.</b> D3 Lite
   handles the core <code>noul</code> routing question, but raw D3 Lite does not
   answer <code>span</code> questions. This environment also includes the
-  span-capable <code>vela3-fast</code> model. The next cells discover its
-  deployment name automatically, show the spans, and then use them in policy.</div>
+  span-capable <code>vela3-fast</code> model. The next cell finds its
+  deployment name automatically, adds it to a PII signal, activates the recipe,
+  and shows the spans Vela found.</div>
 </div>
 
 Use only fictional data in the demonstration prompt.
@@ -1369,104 +1370,34 @@ Use only fictional data in the demonstration prompt.
     ),
     code(
         r"""
-# Optional: ask the deployed Vela model for exact PII spans.
+# Optional: wire Vela into a PII signal and see the spans it finds.
 PII_DEMO_PROMPT = (
     "Demo record: update Jane Doe at jane.doe@example.com "
     "and call 415-555-0134."
 )
 
-VELA_DEPLOYMENT = None
 VELA_PII_SPANS = []
 
-try:
-    capabilities_response = requests.get(
-        f"{MANAGEMENT_API}/api/v1/diagnostics/models/systemone",
-        timeout=30,
-    )
-    capabilities_response.raise_for_status()
-    deployments = capabilities_response.json().get("deployments", [])
-    vela = next(
-        (
-            item
-            for item in deployments
-            if item.get("ready")
-            and "span" in item.get("question_types", [])
-            and (
-                item.get("family") == "vela3"
-                or item.get("model") == "vela3-fast"
-                or "vela3-fast" in item.get("artifact", "")
-            )
-        ),
-        None,
-    )
-
-    if vela is None:
-        print("Optional Vela span extension is not enabled on this host; skip it.")
-    else:
-        span_response = requests.post(
-            f"{MANAGEMENT_API}/api/v1/diagnostics/models/systemone",
-            json={
-                "deployment": vela["id"],
-                "request": {
-                    "state": PII_DEMO_PROMPT,
-                    "questions": {
-                        "personal_data_spans": {
-                            "type": "span",
-                            "instructions": "Which spans are personal information?",
-                            "criteria": [
-                                "PERSON",
-                                "EMAIL_ADDRESS",
-                                "PHONE_NUMBER",
-                            ],
-                        }
-                    },
-                    "options": {"return_meta": True},
-                },
-            },
-            timeout=90,
-        )
-        span_response.raise_for_status()
-        span_body = span_response.json()
-        VELA_PII_SPANS = span_body.get("spans", {}).get(
-            "personal_data_spans",
-            [],
-        )
-        VELA_DEPLOYMENT = vela["id"]
-
-        print("Vela deployment:", VELA_DEPLOYMENT)
-        print("PROMPT")
-        print(" ", PII_DEMO_PROMPT)
-        print("Detected spans:")
-        for span in VELA_PII_SPANS:
-            print(
-                f"  {span['label']:14} {span['text']!r} "
-                f"characters {span['start']}:{span['end']} "
-                f"score={span['probability']:.3f}"
-            )
-except requests.RequestException as exc:
-    print("Optional Vela span extension is unavailable:", type(exc).__name__)
-"""
+# The Router serves only the models the active recipe uses, so look for Vela
+# in the model catalog rather than in the list of models running right now.
+catalog = (
+    requests.get(f"{MANAGEMENT_API}/api/v1/config", timeout=30)
+    .json()
+    .get("global", {})
+    .get("model_catalog", {})
+    .get("deployments", {})
+)
+VELA_DEPLOYMENT = next(
+    (
+        name
+        for name, deployment in catalog.items()
+        if "vela3" in f"{name} {deployment.get('artifact', '')}".lower()
     ),
-    md(
-        r"""
-The diagnostic call above asks the signal model directly and does **not**
-change routing policy. If spans appeared, wire the same Vela deployment into
-a real PII signal:
+    None,
+)
 
-```text
-PROMPT
-→ Vela locates PII spans
-→ personal-data signal matches
-→ pii-local decision wins by priority
-→ Routine route
-```
-"""
-    ),
-    code(
-        r"""
-# Optional: add Vela-backed PII evidence to the recipe from Section 6.
 if VELA_DEPLOYMENT is None:
-    print("Skip this cell because no ready Vela span deployment was discovered.")
+    print("Optional Vela span extension is not installed on this host; skip it.")
 else:
     pii_recipe = copy.deepcopy(private_recipe)
     pii_recipe["signals"]["pii"] = [
@@ -1515,7 +1446,85 @@ else:
     print("Saved optional Dashboard-ready recipe:")
     print(pii_recipe_path)
 
+    # Activating a recipe that uses Vela is what starts it.
     apply_recipe(pii_recipe)
+    deadline = time.monotonic() + 300
+    while time.monotonic() < deadline:
+        deployments = requests.get(
+            f"{MANAGEMENT_API}/api/v1/diagnostics/models/systemone",
+            timeout=30,
+        ).json().get("deployments", [])
+        if any(
+            item.get("id") == VELA_DEPLOYMENT and item.get("ready")
+            for item in deployments
+        ):
+            break
+        time.sleep(2)
+    else:
+        raise RuntimeError(f"{VELA_DEPLOYMENT} did not become ready.")
+
+    span_response = requests.post(
+        f"{MANAGEMENT_API}/api/v1/diagnostics/models/systemone",
+        json={
+            "deployment": VELA_DEPLOYMENT,
+            "request": {
+                "state": PII_DEMO_PROMPT,
+                "questions": {
+                    "personal_data_spans": {
+                        "type": "span",
+                        "instructions": "Which spans are personal information?",
+                        "criteria": [
+                            "PERSON",
+                            "EMAIL_ADDRESS",
+                            "PHONE_NUMBER",
+                        ],
+                    }
+                },
+                "options": {"return_meta": True},
+            },
+        },
+        timeout=90,
+    )
+    span_response.raise_for_status()
+    VELA_PII_SPANS = span_response.json().get("spans", {}).get(
+        "personal_data_spans",
+        [],
+    )
+
+    print()
+    print("Vela deployment:", VELA_DEPLOYMENT)
+    print("PROMPT")
+    print(" ", PII_DEMO_PROMPT)
+    print("Detected spans:")
+    for span in VELA_PII_SPANS:
+        print(
+            f"  {span['label']:14} {span['text']!r} "
+            f"characters {span['start']}:{span['end']} "
+            f"score={span['probability']:.3f}"
+        )
+"""
+    ),
+    md(
+        r"""
+Activating the recipe is what started Vela: the Router serves only the models
+that the active policy uses. The span call above asked Vela directly. The next
+cell sends prompts through the routing policy itself:
+
+```text
+PROMPT
+→ Vela locates PII spans
+→ personal-data signal matches
+→ pii-local decision wins by priority
+→ Routine route
+```
+"""
+    ),
+    code(
+        r"""
+# Optional: route the PII prompt and a clean control.
+if VELA_DEPLOYMENT is None:
+    print("Skip this cell because Vela is not installed on this host.")
+else:
     pii_route_result = preview_route(PII_DEMO_PROMPT)
     print()
     clean_route_result = preview_route(

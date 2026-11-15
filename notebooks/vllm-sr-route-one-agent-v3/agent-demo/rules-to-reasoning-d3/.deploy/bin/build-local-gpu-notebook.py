@@ -131,11 +131,13 @@ for cell in notebook.cells:
     )
     source = source.replace(
         "This environment also includes the\n"
-        "  span-capable <code>vela3-fast</code> model. The next cells discover its\n"
-        "  deployment name automatically, show the spans, and then use them in policy.",
-        "The next cells discover a span-capable\n"
-        "  Vela deployment automatically, show the spans, and then use them in policy.\n"
-        "  If this host does not expose Vela, the optional cells skip cleanly.",
+        "  span-capable <code>vela3-fast</code> model. The next cell finds its\n"
+        "  deployment name automatically, adds it to a PII signal, activates the recipe,\n"
+        "  and shows the spans Vela found.",
+        "The next cell finds a span-capable Vela\n"
+        "  deployment automatically, adds it to a PII signal, activates the recipe,\n"
+        "  and shows the spans Vela found. If this host does not include Vela, the\n"
+        "  optional cells skip cleanly.",
     )
 
     if source.startswith("## 0. Connect to the models on Azure Foundry"):
